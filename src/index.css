@@ -1,0 +1,11 @@
+/* FILE: src/index.css */
+
+/* Removemos todos os estilos padrão que limitavam a largura e centralizavam o conteúdo. */
+/* Agora, garantimos que os elementos principais ocupem todo o espaço disponível. */
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
