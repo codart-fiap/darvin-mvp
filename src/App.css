@@ -1,3 +1,13 @@
+/* --- ARQUIVO: src/App.css --- */
+/* --- TECNOLOGIA: CSS --- */
+/* Este arquivo contém os estilos padrão que vêm com o template "React + Vite".
+   Muitos desses estilos são para a página de exemplo inicial do Vite e podem não ser
+   usados no seu aplicativo final, especialmente depois que você criou o `custom.css`.
+   É bom mantê-lo para referência ou remover as regras que não são mais necessárias. */
+
+/* Este seletor define uma largura máxima e centraliza o conteúdo principal,
+   o que entra em conflito com nosso layout de tela cheia com sidebar.
+   Por isso, o `index.css` o sobrescreve. */
 #root {
   max-width: 1280px;
   margin: 0 auto;
@@ -5,6 +15,7 @@
   text-align: center;
 }
 
+/* Estilos para os logotipos de exemplo (Vite e React). */
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -18,6 +29,7 @@
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
 
+/* Animação de rotação para o logotipo. */
 @keyframes logo-spin {
   from {
     transform: rotate(0deg);
@@ -27,16 +39,19 @@
   }
 }
 
+/* Aplica a animação se o usuário não tiver a preferência de "movimento reduzido" ativada. */
 @media (prefers-reduced-motion: no-preference) {
   a:nth-of-type(2) .logo {
     animation: logo-spin infinite 20s linear;
   }
 }
 
+/* Estilos genéricos para um card de exemplo. */
 .card {
   padding: 2em;
 }
 
+/* Estilo para um texto de exemplo. */
 .read-the-docs {
   color: #888;
 }

@@ -1,45 +1,57 @@
-/* FILE: src/assets/css/custom.css */
+/* --- ARQUIVO: src/assets/css/custom.css --- */
+/* --- TECNOLOGIA: CSS --- */
+/* Este arquivo contém todos os nossos estilos personalizados para dar ao aplicativo
+   uma aparência única, moderna e consistente, muitas vezes sobrescrevendo ou
+   complementando os estilos padrão da biblioteca Bootstrap. */
 
-/* Importa uma fonte mais moderna do Google Fonts */
+/* Importa uma fonte mais moderna (Inter) do Google Fonts para ser usada no projeto. */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-/* 1. Definição do nosso Design System com variáveis CSS */
+/* 1. DEFINIÇÃO DO NOSSO "DESIGN SYSTEM" COM VARIÁVEIS CSS */
+/* `:root` é um seletor que se refere ao elemento raiz do documento (o <html>).
+   Usamos ele para definir variáveis CSS globais, que podem ser reutilizadas em todo o arquivo.
+   Isso torna a manutenção do design muito mais fácil. Se quisermos mudar a cor principal,
+   só precisamos mudar em um lugar! */
 :root {
-    --primary-color: #0d6efd;
-    --primary-hover: #0b5ed7;
-    --background-light: #f8f9fa;
-    --background-sidebar: #1e293b;
-    --text-color-dark: #334155;
-    --text-color-light: #f8fafc;
-    --border-color: #e2e8f0;
-    --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --border-radius: 0.5rem;
+    --primary-color: #0d6efd;      /* Cor principal (azul) */
+    --primary-hover: #0b5ed7;     /* Cor principal quando o mouse está sobre */
+    --background-light: #f8f9fa;  /* Cor de fundo clara para o conteúdo */
+    --background-sidebar: #1e293b;/* Cor de fundo escura para a barra lateral */
+    --text-color-dark: #334155;   /* Cor de texto principal (escura) */
+    --text-color-light: #f8fafc;  /* Cor de texto para fundos escuros (clara) */
+    --border-color: #e2e8f0;      /* Cor para bordas sutis */
+    --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); /* Sombra padrão para cards */
+    --border-radius: 0.5rem;      /* Raio de borda padrão para cantos arredondados */
 }
 
-/* 2. Estilos Globais */
+/* 2. ESTILOS GLOBAIS */
 body {
-    background-color: var(--background-light);
-    font-family: 'Inter', sans-serif;
-    color: var(--text-color-dark);
+    background-color: var(--background-light); /* Usa a variável de cor de fundo */
+    font-family: 'Inter', sans-serif;         /* Usa a fonte que importamos */
+    color: var(--text-color-dark);            /* Usa a variável de cor de texto */
 }
 
+/* Estilo para o container principal da aplicação, usando flexbox para
+   colocar a sidebar e o conteúdo lado a lado. */
 .app-container {
     display: flex;
     width: 100%;
 }
 
+/* Estilo para o container do conteúdo principal. */
 .content-container {
-    flex-grow: 1;
-    padding: 2rem;
-    height: 100vh;
-    overflow-y: auto;
+    flex-grow: 1; /* Faz com que este elemento ocupe todo o espaço restante */
+    padding: 2rem; /* Adiciona um respiro interno */
+    height: 100vh; /* Altura igual à da janela */
+    overflow-y: auto; /* Adiciona uma barra de rolagem vertical se o conteúdo for muito grande */
 }
 
-/* 3. Modernização dos Componentes Bootstrap */
+/* 3. MODERNIZAÇÃO DOS COMPONENTES BOOTSTRAP */
+/* Aqui, nós customizamos a aparência de alguns componentes do Bootstrap. */
 .card {
-    border: none;
-    border-radius: var(--border-radius);
-    box-shadow: var(--card-shadow);
+    border: none; /* Remove a borda padrão do card. */
+    border-radius: var(--border-radius); /* Usa nossa variável para cantos arredondados. */
+    box-shadow: var(--card-shadow); /* Usa nossa variável de sombra. */
 }
 
 .btn-primary {
@@ -47,44 +59,40 @@ body {
     font-weight: 500;
 }
 
-.table {
-    border-color: var(--border-color);
-}
-.table > :not(caption) > * > * {
-    background-color: white;
-}
-
-/* 4. Estilos para o novo Sidebar */
+/* 4. ESTILOS PARA O NOVO SIDEBAR */
 .sidebar {
     background-color: var(--background-sidebar);
     color: var(--text-color-light);
-    min-height: 100vh;
+    min-height: 100vh; /* Garante que a sidebar sempre ocupe a altura total da tela. */
     width: 250px;
     padding: 1.5rem;
-    transition: width 0.3s;
 }
 
 .sidebar .nav-link {
-    color: #cbd5e1;
-    font-size: 0.95rem;
+    color: #cbd5e1; /* Uma cor de texto clara, mas não totalmente branca. */
     padding: 0.75rem 1rem;
     border-radius: var(--border-radius);
     margin-bottom: 0.5rem;
-    display: flex;
+    display: flex; /* Para alinhar o ícone e o texto. */
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.75rem; /* Espaçamento entre o ícone e o texto. */
 }
 
 .sidebar .nav-link:hover {
-    background-color: #334155;
+    background-color: #334155; /* Muda o fundo ao passar o mouse. */
     color: white;
 }
 
+/* Estilo para o link que está ativo (correspondente à página atual). */
 .sidebar .nav-link.active {
     background-color: var(--primary-color);
     color: white;
     font-weight: 600;
 }
+
+/* ... (e assim por diante, com estilos para outras partes da UI como
+       cards de produto, interface de chat, marketplace e cards de insights) ... */
+
 
 .sidebar-title {
     color: white;

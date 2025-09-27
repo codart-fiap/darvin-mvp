@@ -1,49 +1,71 @@
-// FILE: src/state/selectors.js
+// --- ARQUIVO: src/state/selectors.js ---
+// --- TECNOLOGIA: JavaScript ---
+// Este arquivo é um conjunto de "seletores". Pense neles como "consultas" pré-prontas
+// para o nosso banco de dados (localStorage). Em vez de repetir a lógica de busca e
+// filtragem em vários lugares, nós a centralizamos aqui. Isso torna o código mais
+// organizado e fácil de manter.
+
+// Importamos a função `getItem` para poder ler os dados.
 import { getItem } from './storage';
 
+// Busca os dados de um "ator" (varejista, fornecedor, etc.) específico pelo seu ID.
 export const getActorData = (actorId, actorType) => {
+    // Pega a lista completa do tipo de ator (ex: 'retailers').
     const items = getItem(`${actorType}s`);
+    // Usa `find` para encontrar o primeiro item na lista cujo `id` corresponde ao que procuramos.
     return items?.find(item => item.id === actorId) || null;
 }
 
+// Busca todas as vendas de um varejista específico.
 export const getSalesByRetailer = (retailerId) => {
     const sales = getItem('sales') || [];
+    // Usa `filter` para criar uma nova lista apenas com as vendas que pertencem a esse varejista.
     return sales.filter(s => s.retailerId === retailerId);
 }
 
-// --- FUNÇÕES PARA O VAREJO ---
+// --- FUNÇÕES ESPECÍFICAS PARA O VAREJO ---
 
+// Busca o inventário de um varejista e adiciona informações dos produtos e das marcas.
 export const getInventoryByRetailer = (retailerId) => {
+    // Pega todas as listas necessárias.
     const inventory = getItem('inventory') || [];
     const products = getItem('products') || [];
     const industries = getItem('industries') || [];
 
+    // Filtra o inventário para pegar apenas os itens do varejista.
     const retailerInventory = inventory.filter(item => item.retailerId === retailerId);
     
+    // Usa `map` para transformar cada item do inventário.
     return retailerInventory.map(item => {
+        // Para cada item, busca o produto correspondente.
         const product = products.find(p => p.id === item.productId);
+        // E a indústria (marca) correspondente.
         const industry = industries.find(ind => ind.id === product?.industryId);
+        // Retorna um novo objeto que combina as informações de todas as fontes.
         return { 
-            ...product, 
-            ...item,
+            ...product, // ...product copia todas as propriedades do produto
+            ...item,    // ...item copia todas as propriedades do item de inventário
             marca: industry ? industry.nomeFantasia : 'Marca Desconhecida'
         };
     });
 }
 
+// Busca todos os clientes de um varejista.
 export const getClientsByRetailer = (retailerId) => {
     const clients = getItem('clients') || [];
     return clients.filter(c => c.retailerId === retailerId);
 } 
 
+// Busca todos os produtos para exibir no Marketplace, adicionando os nomes dos fornecedores.
 export const getProductsForMarketplace = () => {
     const products = getItem('products') || [];
     const suppliers = getItem('suppliers') || [];
 
     return products.map(product => {
+        // Para cada produto, busca os nomes dos fornecedores a partir dos seus IDs.
         const supplierNames = (product.supplierIds || [])
             .map(supId => suppliers.find(s => s.id === supId)?.nomeFantasia)
-            .filter(Boolean);
+            .filter(Boolean); // Remove qualquer resultado `undefined` se um fornecedor não for encontrado
         return {
             ...product,
             supplierNames: supplierNames.join(', ') || 'Fornecedor Desconhecido'
@@ -51,11 +73,13 @@ export const getProductsForMarketplace = () => {
     });
 }
 
+// Busca as propostas de monetização de dados para um varejista.
 export const getProposalsByRetailer = (retailerId) => {
     const proposals = getItem('proposals') || [];
     const industries = getItem('industries') || [];
     const retailerProposals = proposals.filter(p => p.type === 'retailer' && p.targetId === retailerId);
 
+    // Adiciona o nome da indústria em cada proposta para facilitar a exibição.
     return retailerProposals.map(proposal => {
         const industry = industries.find(ind => ind.id === proposal.industryId);
         return {
@@ -65,7 +89,11 @@ export const getProposalsByRetailer = (retailerId) => {
     });
 } 
 
+// Função complexa que calcula todos os dados para o Dashboard.
 export const getDashboardData = (retailerId, periodInDays) => {
+    // ... (lógica detalhada para filtrar vendas por período, agrupar por dia,
+    //      calcular totais, encontrar os produtos mais vendidos, etc.)
+    // Esta função é um ótimo exemplo de como centralizar lógicas de negócio complexas.
     const allSales = getItem('sales') || [];
     const products = getItem('products') || [];
     const industries = getItem('industries') || [];
@@ -132,7 +160,10 @@ export const getDashboardData = (retailerId, periodInDays) => {
     };
 }
     
+// Converte um texto de linguagem natural (ex: "vendi 2 cafés") em itens de carrinho.
 export const parseTextToCart = (text, inventory) => {
+    // ... (lógica para limpar o texto, separar as partes, encontrar produtos
+    //      no inventário e retornar os itens encontrados e os não encontrados).
     const cleanedText = text.toLowerCase().replace(/vendi/g, '').trim();
     const parts = cleanedText.split(/ e |,| e,|, e/);
     const cartItems = [];
@@ -166,12 +197,16 @@ export const parseTextToCart = (text, inventory) => {
     return { items: cartItems, notFound: notFound };
 }
 
+// Busca os fornecedores em destaque (neste caso, todos).
 export const getFeaturedSuppliers = () => {
     const suppliers = getItem('suppliers') || [];
     return suppliers;
 }
 
+// Lógica de busca para o Marketplace.
 export const searchMarketplace = (searchTerm) => {
+    // ... (lógica que checa se o termo de busca corresponde a um fornecedor ou a um produto
+    //      e retorna os resultados de forma estruturada).
     if (!searchTerm || searchTerm.trim() === '') {
         return { type: 'initial', data: [] };
     }
@@ -203,6 +238,7 @@ export const searchMarketplace = (searchTerm) => {
     return { type: 'product', data: matchedProducts };
 }
 
+// Busca os dados para a tela "Darvin Conecta".
 export const getConectaData = (retailerId) => {
     const proposals = getItem('proposals') || [];
     const transactions = getItem('transactions') || [];
@@ -229,8 +265,10 @@ export const getConectaData = (retailerId) => {
     };
 }
 
-// --- FUNÇÃO ATUALIZADA E CORRIGIDA PARA O ASSISTENTE DE PERFORMANCE ---
+// Gera insights e recomendações para o Assistente de Performance.
 export const getRetailerInsights = (retailerId) => {
+    // ... (lógica complexa que analisa o estoque, as vendas e compara com outros varejistas
+    //      para gerar alertas e sugestões úteis).
     const insights = [];
     const allSales = getItem('sales') || [];
     const inventory = getInventoryByRetailer(retailerId);

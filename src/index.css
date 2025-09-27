@@ -1,11 +1,16 @@
-/* FILE: src/index.css */
+/* --- ARQUIVO: src/index.css --- */
+/* --- TECNOLOGIA: CSS --- */
+/* Este é um arquivo de CSS global. Os estilos definidos aqui se aplicam a toda a aplicação. */
 
-/* Removemos todos os estilos padrão que limitavam a largura e centralizavam o conteúdo. */
-/* Agora, garantimos que os elementos principais ocupem todo o espaço disponível. */
+/* Os estilos padrão que vieram com o template do Vite foram removidos
+   porque eles limitavam a largura e centralizavam o conteúdo, o que não
+   queremos para o layout da nossa aplicação (com sidebar). */
 
+/* Esta regra garante que os elementos `html`, `body` e a `div` raiz do React (`#root`)
+   ocupem 100% da altura e da largura da janela do navegador. */
 html, body, #root {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  width: 100%;
+  margin: 0; /* Remove margens padrão do navegador. */
+  padding: 0; /* Remove preenchimentos padrão do navegador. */
+  height: 100%; /* Faz com que a altura seja igual à da janela. */
+  width: 100%; /* Faz com que a largura seja igual à da janela. */
 }

@@ -1,15 +1,23 @@
 {
+  "_comment": "--- ARQUIVO: package.json ---",
+  "_comment_": "--- TECNOLOGIA: NPM / Node.js ---",
+  "_comment__": "Este arquivo é o 'RG' do seu projeto. Ele descreve o projeto e, mais importante, lista todas as 'dependências' (outros pacotes de código que seu projeto precisa para funcionar).",
+
   "name": "darvin-mvp",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+
   "scripts": {
+    "_comment": "A seção 'scripts' define comandos de atalho que você pode rodar com 'npm run <nome_do_comando>'.",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
+
   "dependencies": {
+    "_comment": "Aqui estão as dependências de produção - pacotes que seu aplicativo precisa para funcionar quando estiver no ar.",
     "bootstrap": "^5.3.1",
     "date-fns": "^2.30.0",
     "react": "^18.2.0",
@@ -22,7 +30,9 @@
     "recharts": "^2.8.0",
     "xlsx": "^0.18.5"
   },
+
   "devDependencies": {
+    "_comment": "E aqui estão as dependências de desenvolvimento - ferramentas que te ajudam a programar, mas que não são necessárias na versão final do site (como o Vite e o ESLint).",
     "@types/react": "^18.2.15",
     "@vitejs/plugin-react": "^4.0.3",
     "eslint": "^8.45.0",
