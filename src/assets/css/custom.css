@@ -211,3 +211,40 @@ body {
     width: 100%;
     text-align: center;
 }
+
+.insight-card .card-footer {
+    background-color: transparent;
+    border-top: 1px solid var(--border-color);
+}
+.insight-card-metric {
+/* ... existing code ... */
+    width: 100%;
+    text-align: center;
+}
+
+/* 9. Estilos para o Carrinho do PDV (Comanda) */
+/* Define uma altura fixa para o card do carrinho, baseada na altura da janela. */
+.pos-cart {
+    height: calc(100vh - 110px);
+}
+
+/* Transforma o corpo do card em um container flexível vertical. */
+.pos-cart .card-body {
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Garante que o corpo ocupe toda a altura do card. */
+    padding: 1rem; /* Adiciona um respiro interno. */
+}
+
+/* Estiliza a área da lista de itens. */
+.pos-cart-items {
+    flex-grow: 1; /* Faz esta área crescer para ocupar todo o espaço livre. */
+    overflow-y: auto; /* Adiciona a barra de rolagem vertical quando necessário. */
+    min-height: 0; /* Correção crucial para evitar que o container "vaze" em um layout flex. */
+}
+
+/* Estiliza a área do rodapé do carrinho (total, botões, etc.). */
+.pos-cart-footer {
+    flex-shrink: 0; /* Impede que o rodapé seja "esmagado" ou encolhido. */
+    padding-top: 1rem; /* Adiciona um espaço acima do total. */
+}
