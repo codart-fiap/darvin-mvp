@@ -1,181 +1,247 @@
 // --- ARQUIVO: src/pages/retail/pos/UploadPOS.jsx ---
 // --- TECNOLOGIA: React, JSX, JavaScript ---
 // Este componente de React permite que o usuário faça o upload de um arquivo de planilha
-// (Excel ou CSV) para registrar várias vendas de uma só vez.
+// (Excel ou CSV) para registrar várias vendas de uma só vez, com uma interface de arrastar e soltar.
 
-import React, { useState, useMemo } from 'react';
-import { useAuth } from '../../../hooks/useAuth';
-import { getInventoryByRetailer } from '../../../state/selectors';
-import { setItem, getItem } from '../../../state/storage';
-import { generateId } from '../../../utils/ids';
-import { Container, Card, Form, Button, Alert, Table } from 'react-bootstrap';
-// Importamos a biblioteca 'xlsx' que é especialista em ler e escrever arquivos de planilha.
+import React, { useState, useMemo, useRef } from 'react';
+import { useAuth } from '/src/hooks/useAuth.js';
+import { getInventoryByRetailer } from '/src/state/selectors.js';
+import { setItem, getItem } from '/src/state/storage.js';
+import { generateId } from '/src/utils/ids.js';
+import { Container, Button, Alert, Table } from 'react-bootstrap';
 import * as XLSX from 'xlsx';
 
-// Definição do componente funcional `UploadPOS`.
 const UploadPOS = () => {
-    // Pegamos os dados do usuário logado usando nosso hook de autenticação.
     const { user } = useAuth();
-    // --- ESTADOS DO COMPONENTE ---
-    // `useState` é um hook do React para criar "estados", que são variáveis que,
-    // quando alteradas, fazem o componente se redesenhar na tela.
-    const [parsedData, setParsedData] = useState([]); // Guarda os dados lidos da planilha.
-    const [fileName, setFileName] = useState(''); // Guarda o nome do arquivo enviado.
-    const [error, setError] = useState(''); // Guarda mensagens de erro para o usuário.
-    const [success, setSuccess] = useState(''); // Guarda mensagens de sucesso.
+    const [parsedData, setParsedData] = useState([]);
+    const [fileName, setFileName] = useState('');
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [isDragging, setIsDragging] = useState(false);
+    const fileInputRef = useRef(null);
 
-    // `useMemo` é um hook de otimização. Ele "memoriza" o resultado de uma função.
-    // O inventário só será recalculado se `user` mudar, evitando trabalho desnecessário.
     const inventory = useMemo(() => user ? getInventoryByRetailer(user.actorId) : [], [user]);
 
-    // Função chamada quando o usuário seleciona um arquivo no campo de upload.
-    const handleFileUpload = (e) => {
-        // Limpamos os estados anteriores.
+    const resetState = () => {
         setError('');
-        setSuccess('');
         setParsedData([]);
-        const file = e.target.files[0]; // Pega o primeiro arquivo selecionado.
-        if (!file) return; // Se nenhum arquivo foi selecionado, não faz nada.
+        setFileName('');
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+        // Mantém a mensagem de sucesso por um tempo para o usuário ver
+        setTimeout(() => setSuccess(''), 5000);
+    };
 
+    const processFile = (file) => {
+        if (!file) return;
+
+        const validExtensions = ['.csv', '.xlsx', '.xls'];
+        const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+        if (!validExtensions.includes(fileExtension)) {
+            setError('Formato de arquivo inválido. Por favor, envie um arquivo .csv, .xls ou .xlsx.');
+            return;
+        }
+
+        resetState();
         setFileName(file.name);
-        // O `FileReader` é uma API do navegador para ler o conteúdo de arquivos.
         const reader = new FileReader();
-        // `onload` é o evento que dispara quando o arquivo terminar de ser lido.
         reader.onload = (evt) => {
-            const bstr = evt.target.result; // O conteúdo do arquivo.
-            // A biblioteca `XLSX` lê o conteúdo do arquivo.
-            const wb = XLSX.read(bstr, { type: 'binary' });
-            const wsname = wb.SheetNames[0]; // Pega o nome da primeira aba da planilha.
-            const ws = wb.Sheets[wsname];
-            // Converte a aba da planilha em um array de arrays (JSON).
-            const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
-
-            // Chamamos nossa função para validar e processar esses dados.
-            processSheetData(data);
+            try {
+                const bstr = evt.target.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                processSheetData(data);
+            } catch (e) {
+                console.error("Erro ao processar o arquivo:", e);
+                setError("Ocorreu um erro ao ler o arquivo. Verifique se ele não está corrompido.");
+            }
         };
-        // Inicia a leitura do arquivo.
         reader.readAsBinaryString(file);
     };
 
-    // Função que valida os dados lidos da planilha.
+    const handleFileSelect = (e) => {
+        const file = e.target.files[0];
+        processFile(file);
+    };
+
     const processSheetData = (data) => {
-        // Pega a primeira linha (cabeçalho) e converte para minúsculas.
-        const headers = data[0].map(h => h.toString().toLowerCase());
-        // Encontra a posição (índice) das colunas 'sku' e 'quantidade'.
+        if (!data || data.length < 2) {
+            setError('A planilha parece estar vazia ou contém apenas o cabeçalho.');
+            return;
+        }
+        const headers = data[0].map(h => h.toString().toLowerCase().trim());
         const skuIndex = headers.indexOf('sku');
         const qtyIndex = headers.indexOf('quantidade');
 
-        // Se não encontrar as colunas necessárias, define um erro.
         if (skuIndex === -1 || qtyIndex === -1) {
             setError('A planilha deve conter as colunas "SKU" e "Quantidade".');
             return;
         }
 
         const salesToProcess = [];
-        // Percorre as linhas da planilha, começando da segunda (a primeira é o cabeçalho).
+        let rowErrors = [];
         for (let i = 1; i < data.length; i++) {
             const row = data[i];
-            const sku = row[skuIndex];
+            if (row.length === 0 || !row[skuIndex]) continue;
+
+            const sku = String(row[skuIndex]);
             const qtde = parseInt(row[qtyIndex], 10);
 
-            // Validações: o produto existe? Tem estoque suficiente?
+            if (isNaN(qtde) || qtde <= 0) {
+                 rowErrors.push(`Quantidade inválida para o SKU ${sku} na linha ${i + 1}.`);
+                 continue;
+            }
+
             const productInInventory = inventory.find(item => item.sku === sku);
             if (!productInInventory) {
-                setError(`SKU "${sku}" na linha ${i + 1} não encontrado no seu estoque.`);
-                return;
+                rowErrors.push(`SKU "${sku}" na linha ${i + 1} não encontrado no seu estoque.`);
+                continue;
             }
             if (productInInventory.estoque < qtde) {
-                setError(`Estoque insuficiente para "${productInInventory.nome}" na linha ${i + 1}.`);
-                return;
+                rowErrors.push(`Estoque insuficiente para "${productInInventory.nome}" (SKU: ${sku}) na linha ${i + 1}.`);
+                continue;
             }
             salesToProcess.push({ ...productInInventory, qtde });
         }
-        // Se tudo estiver OK, salva os dados processados no estado para pré-visualização.
+        
+        if (rowErrors.length > 0) {
+             setError(rowErrors.slice(0, 3).join(' ')); // Mostra os 3 primeiros erros
+             return;
+        }
+        if (salesToProcess.length === 0) {
+            setError("Nenhum registro de venda válido foi encontrado na planilha.");
+            return;
+        }
         setParsedData(salesToProcess);
     };
-
-    // Função chamada quando o usuário clica no botão para confirmar as vendas.
+    
     const handleRegisterSales = () => {
-        const newSales = [];
-        // Cria um registro de venda para cada linha da planilha.
-        parsedData.forEach(item => {
-            // ... (cria o objeto de venda)
-        });
-
-        // Salva as novas vendas no localStorage.
+        if (parsedData.length === 0) return;
+    
         const allSales = getItem('sales') || [];
-        setItem('sales', [...allSales, ...newSales]);
-
-        // Atualiza o estoque, subtraindo as quantidades vendidas.
         const currentInventory = getItem('inventory') || [];
+    
+        // Para o registro de venda, agrupamos todos os itens da planilha em uma única transação
+        const newSaleItems = parsedData.map(item => ({
+            productId: item.productId,
+            sku: item.sku,
+            qtde: item.qtde,
+            precoUnit: item.precoSugerido
+        }));
+    
+        const totalBruto = newSaleItems.reduce((acc, item) => acc + (item.qtde * item.precoUnit), 0);
+    
+        const newSale = {
+            id: generateId(),
+            retailerId: user.actorId,
+            dataISO: new Date().toISOString(),
+            clienteId: 'consumidor_final',
+            itens: newSaleItems,
+            totalBruto: totalBruto,
+            desconto: 0,
+            totalLiquido: totalBruto,
+            formaPagamento: 'Upload de Planilha',
+        };
+    
+        setItem('sales', [...allSales, newSale]);
+    
+        // Atualiza o estoque
         const updatedInventory = currentInventory.map(invItem => {
             const itemSold = parsedData.find(p => p.productId === invItem.productId);
             if (itemSold) {
-                return { ...invItem, estoque: invItem.estoque - itemSold.qtde };
+                // Se um produto aparece várias vezes na planilha, precisamos somar as quantidades
+                const totalQtdeSold = parsedData
+                    .filter(p => p.productId === invItem.productId)
+                    .reduce((sum, current) => sum + current.qtde, 0);
+                return { ...invItem, estoque: invItem.estoque - totalQtdeSold };
             }
             return invItem;
         });
         setItem('inventory', updatedInventory);
-
-        // Limpa a tela e mostra uma mensagem de sucesso.
-        setSuccess(`${parsedData.length} vendas foram registradas com sucesso!`);
-        setParsedData([]);
-        setFileName('');
-    };
     
-    // Se ainda não temos a informação do usuário, mostramos uma mensagem de carregamento.
-    if (!user) {
-        return <Container><p>Carregando...</p></Container>;
+        setSuccess(`${parsedData.length} registros de venda foram agrupados e registrados com sucesso!`);
+        resetState();
+    };
+
+    const handleDragEnter = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
+    const handleDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
+    const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
+    const handleDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        const file = e.dataTransfer.files[0];
+        processFile(file);
+    };
+
+    const triggerFileSelect = () => fileInputRef.current.click();
+
+    if (!user) return <Container><p>Carregando...</p></Container>;
+
+    if (parsedData.length > 0) {
+        return (
+            <Container fluid className="p-4">
+                 <h3 className="mb-3">Pré-visualização das Vendas</h3>
+                 <p>Encontramos <strong>{parsedData.length}</strong> registros de venda no arquivo "{fileName}". Revise e confirme para registrar.</p>
+                 {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
+                 <Table striped bordered hover responsive size="sm">
+                     <thead><tr><th>SKU</th><th>Produto</th><th>Quantidade</th><th className="text-end">Subtotal</th></tr></thead>
+                     <tbody>
+                         {parsedData.map((item, index) => (
+                             <tr key={index}>
+                                 <td>{item.sku}</td>
+                                 <td>{item.nome}</td>
+                                 <td>{item.qtde}</td>
+                                 <td className="text-end">R$ {(item.qtde * item.precoSugerido).toFixed(2)}</td>
+                             </tr>
+                         ))}
+                     </tbody>
+                 </Table>
+                 <div className="d-flex gap-2 mt-3">
+                     <Button variant="primary" onClick={handleRegisterSales}>Confirmar e Registrar Vendas</Button>
+                     <Button variant="outline-secondary" onClick={resetState}>Cancelar Upload</Button>
+                 </div>
+            </Container>
+        );
     }
 
-    // --- RENDERIZAÇÃO DO COMPONENTE ---
-    // O que este componente irá desenhar na tela. Usa componentes do React Bootstrap.
     return (
-        <Container fluid>
-            <Card>
-                <Card.Body>
-                    <Card.Title>Upload de Planilha de Vendas</Card.Title>
-                    <Card.Subtitle className="mb-3 text-muted">
-                        Importe um arquivo .xlsx ou .csv com as colunas "SKU" e "Quantidade".
-                    </Card.Subtitle>
-
-                    {/* Mostra alertas de erro ou sucesso, se existirem */}
-                    {error && <Alert variant="danger">{error}</Alert>}
-                    {success && <Alert variant="success">{success}</Alert>}
-
-                    {/* O campo de formulário para o upload do arquivo */}
-                    <Form.Group controlId="formFile" className="mb-3">
-                        <Form.Label>Selecione o arquivo de vendas</Form.Label>
-                        <Form.Control type="file" accept=".xlsx, .csv" onChange={handleFileUpload} />
-                    </Form.Group>
-
-                    {/* A pré-visualização só aparece se houver dados processados */}
-                    {parsedData.length > 0 && (
-                        <>
-                            <hr />
-                            <h5>Pré-visualização das Vendas</h5>
-                            <p>Encontramos <strong>{parsedData.length}</strong> vendas no arquivo "{fileName}".</p>
-                            <Table striped bordered hover responsive>
-                                <thead><tr><th>SKU</th><th>Produto</th><th>Quantidade</th></tr></thead>
-                                <tbody>
-                                    {parsedData.map((item, index) => (
-                                        <tr key={index}>
-                                            <td>{item.sku}</td>
-                                            <td>{item.nome}</td>
-                                            <td>{item.qtde}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </Table>
-                            <div className="d-grid">
-                                <Button onClick={handleRegisterSales}>Confirmar e Registrar Vendas</Button>
-                            </div>
-                        </>
-                    )}
-                </Card.Body>
-            </Card>
-        </Container>
+        <div className="upload-container">
+            <h2 className="text-center">Importar dados de vendas</h2>
+            <p className="text-center text-muted mb-4">Arraste e solte seu arquivo ou selecione-o do seu computador.</p>
+            {error && <Alert variant="danger" className="mx-auto" style={{maxWidth: '600px'}} onClose={() => setError('')} dismissible>{error}</Alert>}
+            {success && <Alert variant="success" className="mx-auto" style={{maxWidth: '600px'}}>{success}</Alert>}
+            <div 
+                className={`drop-zone ${isDragging ? 'dragging' : ''}`}
+                onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop}
+            >
+                <input
+                    type="file" ref={fileInputRef} onChange={handleFileSelect}
+                    accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                    style={{ display: 'none' }}
+                />
+                <div className="drop-zone-content">
+                    <div className="drop-zone-icon-wrapper">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="currentColor" className="bi bi-file-earmark-text drop-zone-icon" viewBox="0 0 16 16">
+                            <path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5z"/>
+                            <path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5L9.5 0zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/>
+                        </svg>
+                    </div>
+                    <h5>Arraste e solte seu arquivo CSV aqui</h5>
+                    <p className="text-muted my-3">ou</p>
+                    <Button variant="success" className="btn-upload" onClick={triggerFileSelect}>
+                       Selecione um arquivo do seu computador
+                    </Button>
+                    <p className="text-muted mt-3"><small>Aceitamos arquivos no formato .CSV ou .XLSX.</small></p>
+                </div>
+            </div>
+            <p className="text-center mt-4">Não sabe por onde começar? <a href="#">Baixe nosso modelo de planilha</a></p>
+        </div>
     );
 };
 
 export default UploadPOS;
+
