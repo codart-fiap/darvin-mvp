@@ -1,247 +1,481 @@
 // --- ARQUIVO: src/pages/retail/pos/UploadPOS.jsx ---
 // --- TECNOLOGIA: React, JSX, JavaScript ---
-// Este componente de React permite que o usuário faça o upload de um arquivo de planilha
-// (Excel ou CSV) para registrar várias vendas de uma só vez, com uma interface de arrastar e soltar.
+// Componente multifásico para upload de planilhas de vendas:
+// 1. Tela de Upload (Arrastar e Soltar)
+// 2. Tela de Mapeamento de Colunas
+// 3. Tela de Validação de Dados
+// 4. (Futuro) Tela de Confirmação Final
 
-import React, { useState, useMemo, useRef } from 'react';
-import { useAuth } from '/src/hooks/useAuth.js';
-import { getInventoryByRetailer } from '/src/state/selectors.js';
-import { setItem, getItem } from '/src/state/storage.js';
-import { generateId } from '/src/utils/ids.js';
-import { Container, Button, Alert, Table } from 'react-bootstrap';
-import * as XLSX from 'xlsx';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useAuth } from '../../../hooks/useAuth';
+import { getInventoryByRetailer } from '../../../state/selectors';
+import { setItem, getItem } from '../../../state/storage';
+import { generateId } from '../../../utils/ids';
+import { Container, Button, Alert, Table, Row, Col, Form, OverlayTrigger, Tooltip, Card } from 'react-bootstrap';
 
+// Definição dos campos que nossa plataforma espera.
+const PLATFORM_FIELDS = [
+    { key: 'product_name', name: 'Nome do Produto', description: 'O nome do produto vendido.', tooltip: 'Este campo deve conter o nome ou SKU do produto.' },
+    { key: 'quantity', name: 'Quantidade Vendida', description: 'A quantidade de unidades vendidas.', tooltip: 'Informe o número de unidades vendidas.' },
+    { key: 'unit_price', name: 'Preço de Venda (Unitário)', description: 'O preço de venda por unidade.', tooltip: 'O valor de venda para uma única unidade.' },
+    { key: 'sale_date', name: 'Data da Venda', description: 'A data em que a venda foi realizada.', tooltip: 'A data da transação (ex: DD/MM/AAAA).' }
+];
+
+// --- Ícones como Componentes SVG ---
+const CheckmarkIcon = () => ( 
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-check-circle-fill text-primary" viewBox="0 0 16 16">
+        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+    </svg> 
+);
+
+const QuestionIcon = () => ( 
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" className="bi bi-question-circle" viewBox="0 0 16 16">
+        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+        <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z"/>
+    </svg> 
+);
+
+const ErrorIcon = () => ( 
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-exclamation-circle-fill me-2 text-danger" viewBox="0 0 16 16">
+        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/>
+    </svg> 
+);
+
+
+// Componente principal
 const UploadPOS = () => {
     const { user } = useAuth();
-    const [parsedData, setParsedData] = useState([]);
-    const [fileName, setFileName] = useState('');
+    const [step, setStep] = useState('upload'); 
+    const [fileHeaders, setFileHeaders] = useState([]);
+    const [fileRawData, setFileRawData] = useState([]);
+    const [columnMap, setColumnMap] = useState({});
+    const [validationResults, setValidationResults] = useState({ all: [], valid: [], newProduct: [], error: [] });
     const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef(null);
 
+    // Carrega a biblioteca XLSX de um CDN
+    useEffect(() => {
+        const scriptId = 'xlsx-script';
+        if (document.getElementById(scriptId)) return;
+        const script = document.createElement('script');
+        script.id = scriptId;
+        script.src = "https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js";
+        script.async = true;
+        document.body.appendChild(script);
+        return () => { 
+            const el = document.getElementById(scriptId); 
+            if (el) el.remove(); 
+        };
+    }, []);
+
     const inventory = useMemo(() => user ? getInventoryByRetailer(user.actorId) : [], [user]);
 
-    const resetState = () => {
+    const resetForNewUpload = () => {
+        setStep('upload'); 
+        setFileHeaders([]); 
+        setFileRawData([]); 
+        setColumnMap({});
+        setValidationResults({ all: [], valid: [], newProduct: [], error: [] }); 
         setError('');
-        setParsedData([]);
-        setFileName('');
-        if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-        }
-        // Mantém a mensagem de sucesso por um tempo para o usuário ver
-        setTimeout(() => setSuccess(''), 5000);
+        if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
     const processFile = (file) => {
         if (!file) return;
-
-        const validExtensions = ['.csv', '.xlsx', '.xls'];
-        const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-        if (!validExtensions.includes(fileExtension)) {
-            setError('Formato de arquivo inválido. Por favor, envie um arquivo .csv, .xls ou .xlsx.');
-            return;
-        }
-
-        resetState();
-        setFileName(file.name);
         const reader = new FileReader();
         reader.onload = (evt) => {
+            if (typeof window.XLSX === 'undefined') {
+                setError("A biblioteca de leitura de planilhas não pôde ser carregada.");
+                return;
+            }
             try {
                 const bstr = evt.target.result;
-                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wb = window.XLSX.read(bstr, { 
+                    type: 'binary', 
+                    cellDates: true,
+                    raw: false,
+                    codepage: 65001 // UTF-8
+                });
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
-                const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
-                processSheetData(data);
+                const data = window.XLSX.utils.sheet_to_json(ws, { 
+                    header: 1,
+                    raw: false,
+                    defval: ''
+                });
+                const headers = data[0].map(h => String(h).trim());
+                const rawData = data.slice(1);
+                setFileHeaders(headers);
+                setFileRawData(rawData);
+                autoMapColumns(headers);
+                setStep('mapping');
             } catch (e) {
-                console.error("Erro ao processar o arquivo:", e);
-                setError("Ocorreu um erro ao ler o arquivo. Verifique se ele não está corrompido.");
+                console.error('Erro ao processar arquivo:', e);
+                setError("Ocorreu um erro ao ler o arquivo. Verifique se o formato está correto.");
             }
         };
         reader.readAsBinaryString(file);
     };
 
-    const handleFileSelect = (e) => {
-        const file = e.target.files[0];
-        processFile(file);
-    };
-
-    const processSheetData = (data) => {
-        if (!data || data.length < 2) {
-            setError('A planilha parece estar vazia ou contém apenas o cabeçalho.');
-            return;
-        }
-        const headers = data[0].map(h => h.toString().toLowerCase().trim());
-        const skuIndex = headers.indexOf('sku');
-        const qtyIndex = headers.indexOf('quantidade');
-
-        if (skuIndex === -1 || qtyIndex === -1) {
-            setError('A planilha deve conter as colunas "SKU" e "Quantidade".');
-            return;
-        }
-
-        const salesToProcess = [];
-        let rowErrors = [];
-        for (let i = 1; i < data.length; i++) {
-            const row = data[i];
-            if (row.length === 0 || !row[skuIndex]) continue;
-
-            const sku = String(row[skuIndex]);
-            const qtde = parseInt(row[qtyIndex], 10);
-
-            if (isNaN(qtde) || qtde <= 0) {
-                 rowErrors.push(`Quantidade inválida para o SKU ${sku} na linha ${i + 1}.`);
-                 continue;
+    const autoMapColumns = (headers) => {
+        const newMap = {};
+        const normalizedHeaders = headers.map(h => h.toLowerCase().replace(/[_\s-]+/g, ' '));
+        PLATFORM_FIELDS.forEach(field => {
+            const fieldNameNormalized = field.name.toLowerCase().replace(/\(unitário\)/, '').trim();
+            let found = headers[normalizedHeaders.findIndex(h => h.includes(fieldNameNormalized))];
+            if (!found && field.key === 'product_name') {
+                found = headers[normalizedHeaders.findIndex(h => h.includes('sku'))];
             }
-
-            const productInInventory = inventory.find(item => item.sku === sku);
-            if (!productInInventory) {
-                rowErrors.push(`SKU "${sku}" na linha ${i + 1} não encontrado no seu estoque.`);
-                continue;
-            }
-            if (productInInventory.estoque < qtde) {
-                rowErrors.push(`Estoque insuficiente para "${productInInventory.nome}" (SKU: ${sku}) na linha ${i + 1}.`);
-                continue;
-            }
-            salesToProcess.push({ ...productInInventory, qtde });
-        }
-        
-        if (rowErrors.length > 0) {
-             setError(rowErrors.slice(0, 3).join(' ')); // Mostra os 3 primeiros erros
-             return;
-        }
-        if (salesToProcess.length === 0) {
-            setError("Nenhum registro de venda válido foi encontrado na planilha.");
-            return;
-        }
-        setParsedData(salesToProcess);
-    };
-    
-    const handleRegisterSales = () => {
-        if (parsedData.length === 0) return;
-    
-        const allSales = getItem('sales') || [];
-        const currentInventory = getItem('inventory') || [];
-    
-        // Para o registro de venda, agrupamos todos os itens da planilha em uma única transação
-        const newSaleItems = parsedData.map(item => ({
-            productId: item.productId,
-            sku: item.sku,
-            qtde: item.qtde,
-            precoUnit: item.precoSugerido
-        }));
-    
-        const totalBruto = newSaleItems.reduce((acc, item) => acc + (item.qtde * item.precoUnit), 0);
-    
-        const newSale = {
-            id: generateId(),
-            retailerId: user.actorId,
-            dataISO: new Date().toISOString(),
-            clienteId: 'consumidor_final',
-            itens: newSaleItems,
-            totalBruto: totalBruto,
-            desconto: 0,
-            totalLiquido: totalBruto,
-            formaPagamento: 'Upload de Planilha',
-        };
-    
-        setItem('sales', [...allSales, newSale]);
-    
-        // Atualiza o estoque
-        const updatedInventory = currentInventory.map(invItem => {
-            const itemSold = parsedData.find(p => p.productId === invItem.productId);
-            if (itemSold) {
-                // Se um produto aparece várias vezes na planilha, precisamos somar as quantidades
-                const totalQtdeSold = parsedData
-                    .filter(p => p.productId === invItem.productId)
-                    .reduce((sum, current) => sum + current.qtde, 0);
-                return { ...invItem, estoque: invItem.estoque - totalQtdeSold };
-            }
-            return invItem;
+            newMap[field.key] = found || '';
         });
-        setItem('inventory', updatedInventory);
-    
-        setSuccess(`${parsedData.length} registros de venda foram agrupados e registrados com sucesso!`);
-        resetState();
+        setColumnMap(newMap);
     };
 
+    const handleValidation = () => {
+        setError('');
+        const mappedIndices = {};
+        for (const field of PLATFORM_FIELDS) {
+            if (!columnMap[field.key]) {
+                setError(`O campo "${field.name}" precisa ser mapeado.`);
+                return;
+            }
+            mappedIndices[field.key] = fileHeaders.indexOf(columnMap[field.key]);
+        }
+
+        const results = { all: [], valid: [], newProduct: [], error: [] };
+        
+        fileRawData.forEach((row, index) => {
+            if (row.every(cell => cell === null || cell === '' || cell === undefined)) return; // Ignora linhas vazias
+
+            // Função auxiliar para limpar e converter valores
+            const cleanValue = (value) => {
+                if (value === null || value === undefined || value === '') return null;
+                return String(value).trim();
+            };
+
+            const productNameRaw = cleanValue(row[mappedIndices.product_name]);
+            const quantityRaw = cleanValue(row[mappedIndices.quantity]);
+            const unitPriceRaw = cleanValue(row[mappedIndices.unit_price]);
+            const saleDateRaw = row[mappedIndices.sale_date];
+
+            const saleData = {
+                productName: productNameRaw,
+                quantity: quantityRaw ? parseFloat(quantityRaw.replace(',','.')) : NaN,
+                unitPrice: unitPriceRaw ? parseFloat(unitPriceRaw.replace(',','.')) : NaN,
+                saleDate: saleDateRaw instanceof Date ? saleDateRaw : new Date(saleDateRaw),
+                originalRow: index + 2,
+            };
+            
+            let status = 'valid';
+            let product = inventory.find(p => 
+                p.nome === saleData.productName || 
+                p.sku === saleData.productName
+            );
+
+            if (!product) status = 'newProduct';
+            else if (isNaN(saleData.quantity) || saleData.quantity <= 0) status = 'error';
+            else if (isNaN(saleData.unitPrice) || saleData.unitPrice < 0) status = 'error';
+            else if (isNaN(saleData.saleDate.getTime())) status = 'error';
+            
+            const resultRow = { ...saleData, status, product };
+            results.all.push(resultRow);
+            results[status].push(resultRow);
+        });
+        
+        setValidationResults(results);
+        setStep('validation');
+    };
+    
+    const handleFinalImport = () => {
+        const allSales = getItem('sales') || [];
+        const newSales = validationResults.valid.map(data => {
+            const total = data.quantity * data.unitPrice;
+            return {
+                id: generateId(), 
+                retailerId: user.actorId, 
+                dataISO: data.saleDate.toISOString(),
+                clienteId: 'consumidor_final',
+                itens: [{ 
+                    productId: data.product.id, 
+                    sku: data.product.sku, 
+                    qtde: data.quantity, 
+                    precoUnit: data.unitPrice 
+                }],
+                totalBruto: total, 
+                desconto: 0, 
+                totalLiquido: total, 
+                formaPagamento: 'Upload de Planilha'
+            };
+        });
+        setItem('sales', [...allSales, ...newSales]);
+        alert(`${newSales.length} vendas foram registradas com sucesso!`);
+        resetForNewUpload();
+    };
+
+    const renderStep = () => {
+        switch (step) {
+            case 'mapping': 
+                return <MappingStep 
+                    headers={fileHeaders} 
+                    map={columnMap} 
+                    setMap={setColumnMap} 
+                    onVerify={handleValidation} 
+                    onCancel={resetForNewUpload} 
+                    error={error} 
+                    setError={setError} 
+                />;
+            case 'validation': 
+                return <ValidationStep 
+                    results={validationResults} 
+                    onConfirm={handleFinalImport} 
+                    onCancel={() => setStep('mapping')} 
+                />;
+            default: 
+                return <UploadStep 
+                    processFile={processFile} 
+                    isDragging={isDragging} 
+                    setIsDragging={setIsDragging} 
+                    fileInputRef={fileInputRef} 
+                />;
+        }
+    };
+    
+    if (!user) return <Container><p>Carregando...</p></Container>;
+    return <div className="upload-container">{renderStep()}</div>;
+};
+
+// --- Sub-componentes para cada etapa ---
+const UploadStep = ({ processFile, isDragging, setIsDragging, fileInputRef }) => {
     const handleDragEnter = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
     const handleDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
     const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
     const handleDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); 
+        e.stopPropagation(); 
         setIsDragging(false);
-        const file = e.dataTransfer.files[0];
-        processFile(file);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            processFile(e.dataTransfer.files[0]);
+        }
     };
-
+    const handleFileSelect = (e) => processFile(e.target.files[0]);
     const triggerFileSelect = () => fileInputRef.current.click();
 
-    if (!user) return <Container><p>Carregando...</p></Container>;
-
-    if (parsedData.length > 0) {
-        return (
-            <Container fluid className="p-4">
-                 <h3 className="mb-3">Pré-visualização das Vendas</h3>
-                 <p>Encontramos <strong>{parsedData.length}</strong> registros de venda no arquivo "{fileName}". Revise e confirme para registrar.</p>
-                 {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
-                 <Table striped bordered hover responsive size="sm">
-                     <thead><tr><th>SKU</th><th>Produto</th><th>Quantidade</th><th className="text-end">Subtotal</th></tr></thead>
-                     <tbody>
-                         {parsedData.map((item, index) => (
-                             <tr key={index}>
-                                 <td>{item.sku}</td>
-                                 <td>{item.nome}</td>
-                                 <td>{item.qtde}</td>
-                                 <td className="text-end">R$ {(item.qtde * item.precoSugerido).toFixed(2)}</td>
-                             </tr>
-                         ))}
-                     </tbody>
-                 </Table>
-                 <div className="d-flex gap-2 mt-3">
-                     <Button variant="primary" onClick={handleRegisterSales}>Confirmar e Registrar Vendas</Button>
-                     <Button variant="outline-secondary" onClick={resetState}>Cancelar Upload</Button>
-                 </div>
-            </Container>
-        );
-    }
-
     return (
-        <div className="upload-container">
+        <div className="upload-step-container">
             <h2 className="text-center">Importar dados de vendas</h2>
             <p className="text-center text-muted mb-4">Arraste e solte seu arquivo ou selecione-o do seu computador.</p>
-            {error && <Alert variant="danger" className="mx-auto" style={{maxWidth: '600px'}} onClose={() => setError('')} dismissible>{error}</Alert>}
-            {success && <Alert variant="success" className="mx-auto" style={{maxWidth: '600px'}}>{success}</Alert>}
             <div 
-                className={`drop-zone ${isDragging ? 'dragging' : ''}`}
-                onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop}
+                className="drop-zone" 
+                onDragEnter={handleDragEnter} 
+                onDragLeave={handleDragLeave} 
+                onDragOver={handleDragOver} 
+                onDrop={handleDrop}
             >
-                <input
-                    type="file" ref={fileInputRef} onChange={handleFileSelect}
-                    accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-                    style={{ display: 'none' }}
-                />
-                <div className="drop-zone-content">
-                    <div className="drop-zone-icon-wrapper">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="currentColor" className="bi bi-file-earmark-text drop-zone-icon" viewBox="0 0 16 16">
-                            <path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5z"/>
-                            <path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5L9.5 0zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/>
+                <div className={`drop-zone-inner ${isDragging ? 'dragging' : ''}`}>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleFileSelect} 
+                        accept=".csv,.xlsx,.xls" 
+                        style={{ display: 'none' }} 
+                    />
+                    <div className="drop-zone-content">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" className="bi bi-cloud-arrow-up-fill text-primary mb-3" viewBox="0 0 16 16">
+                            <path d="M8 2a5.53 5.53 0 0 0-3.594 1.342c-.766.66-1.321 1.52-1.464 2.383C1.266 6.095 0 7.555 0 9.318 0 11.366 1.708 13 3.781 13h8.906C14.502 13 16 11.57 16 9.773c0-1.636-1.242-2.969-2.834-3.194C12.923 3.999 10.69 2 8 2zm2.354 5.146a.5.5 0 0 1-.708.708L8.5 6.707V10.5a.5.5 0 0 1-1 0V6.707L6.354 7.854a.5.5 0 1 1-.708-.708l2-2a.5.5 0 0 1 .708 0l2 2z"/>
                         </svg>
+                        <h5 className="text-secondary">Arraste e solte seu arquivo aqui</h5>
+                        <p className="text-muted my-2">ou</p>
+                        <Button variant="primary" className="btn-upload" onClick={triggerFileSelect}>
+                            Selecione um arquivo
+                        </Button>
+                        <p className="text-muted small mt-3">Aceitamos arquivos no formato .CSV ou .XLSX.</p>
                     </div>
-                    <h5>Arraste e solte seu arquivo CSV aqui</h5>
-                    <p className="text-muted my-3">ou</p>
-                    <Button variant="success" className="btn-upload" onClick={triggerFileSelect}>
-                       Selecione um arquivo do seu computador
-                    </Button>
-                    <p className="text-muted mt-3"><small>Aceitamos arquivos no formato .CSV ou .XLSX.</small></p>
                 </div>
             </div>
-            <p className="text-center mt-4">Não sabe por onde começar? <a href="#">Baixe nosso modelo de planilha</a></p>
+            <a href="#" className="mt-4 d-block text-center">Não sabe por onde começar? Baixe nosso modelo de planilha</a>
         </div>
     );
 };
 
-export default UploadPOS;
+const MappingStep = ({ headers, map, setMap, onVerify, onCancel, error, setError }) => {
+    const [rememberMapping, setRememberMapping] = useState(true);
+    
+    const handleSelectChange = (platformKey, selectedHeader) => {
+        setMap(prevMap => ({ ...prevMap, [platformKey]: selectedHeader }));
+    };
 
+    return (
+        <div className="mapping-screen-bg">
+            <div className="mapping-container">
+                {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
+                <Row className="g-5">
+                    <Col lg={6}>
+                        <h2 className="mapping-title">Campos da Nossa Plataforma</h2>
+                        <div className="d-flex flex-column gap-3">
+                            {PLATFORM_FIELDS.map(field => (
+                                <div key={field.key} className="platform-field-card">
+                                    <div>
+                                        <p className="fw-semibold mb-1">{field.name}</p>
+                                        <p className="text-muted small mb-0">{field.description}</p>
+                                    </div>
+                                    <OverlayTrigger placement="top" overlay={<Tooltip>{field.tooltip}</Tooltip>}>
+                                        <button className="btn-icon">
+                                            <QuestionIcon />
+                                        </button>
+                                    </OverlayTrigger>
+                                </div>
+                            ))}
+                        </div>
+                    </Col>
+                    <Col lg={6}>
+                        <h2 className="mapping-title">Colunas do Seu Arquivo</h2>
+                        <div className="d-flex flex-column gap-4">
+                            {PLATFORM_FIELDS.map(field => (
+                                <div key={field.key} className="mapping-field-item">
+                                    <Form.Group>
+                                        <Form.Label className="small fw-medium mb-2">{field.name}</Form.Label>
+                                        <div className="mapping-input-wrapper">
+                                            <Form.Select 
+                                                className="mapping-select" 
+                                                value={map[field.key] || ''} 
+                                                onChange={(e) => handleSelectChange(field.key, e.target.value)}
+                                            >
+                                                <option value="" disabled>Selecione uma coluna</option>
+                                                {headers.map((header, index) => (
+                                                    <option key={index} value={header}>{header}</option>
+                                                ))}
+                                                <option value="">Não informar</option>
+                                            </Form.Select>
+                                            {map[field.key] && <CheckmarkIcon />}
+                                        </div>
+                                    </Form.Group>
+                                </div>
+                            ))}
+                        </div>
+                    </Col>
+                </Row>
+                <div className="mapping-footer">
+                    <Form.Check 
+                        type="switch" 
+                        id="remember-mapping-switch" 
+                        label="Lembrar desta organização" 
+                        checked={rememberMapping} 
+                        onChange={(e) => setRememberMapping(e.target.checked)} 
+                    />
+                    <Button variant="primary" className="verify-button" onClick={onVerify}>
+                        Verificar e pré-visualizar dados
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ValidationStep = ({ results, onConfirm, onCancel }) => {
+    const renderDate = (date) => {
+        if (date instanceof Date && !isNaN(date)) {
+            return date.toLocaleDateString('pt-BR');
+        }
+        return <span className="text-danger">Data Inválida</span>;
+    };
+
+    const renderNumber = (num) => {
+        if (typeof num === 'number' && !isNaN(num)) {
+            return num;
+        }
+        return <span className="text-danger">Inválido</span>;
+    };
+
+    const renderPrice = (price) => {
+        if (typeof price === 'number' && !isNaN(price)) {
+            return `R$ ${price.toFixed(2)}`;
+        }
+        return <span className="text-danger">Inválido</span>;
+    };
+
+    return (
+        <div className="validation-container">
+            <div className="validation-header">
+                <p className="text-muted small mb-2">Importar / Validar Dados</p>
+                <h2>Validar Dados</h2>
+                <p className="text-muted">Revise os dados importados, cadastre novos produtos e corrija erros antes de confirmar.</p>
+            </div>
+
+            <Card className="summary-card">
+                <Card.Body>
+                    <Row className="text-center">
+                        <Col>
+                            <p className="text-muted small mb-1">Vendas Válidas</p>
+                            <h3 className="summary-count">{results.valid.length}</h3>
+                        </Col>
+                        <Col>
+                            <p className="text-muted small mb-1">Produtos Não Cadastrados</p>
+                            <h3 className="summary-count text-warning">{results.newProduct.length}</h3>
+                        </Col>
+                        <Col>
+                            <p className="text-muted small mb-1">Erros de Dados</p>
+                            <h3 className="summary-count text-danger">{results.error.length}</h3>
+                        </Col>
+                    </Row>
+                </Card.Body>
+            </Card>
+
+            <div className="validation-table-container">
+                <Table hover responsive className="validation-table">
+                    <thead>
+                        <tr>
+                            <th>Data da Venda</th>
+                            <th>Produto</th>
+                            <th>Quantidade</th>
+                            <th>Preço Unitário</th>
+                            <th>Total</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {results.all.map((row, index) => {
+                            const total = isNaN(row.quantity) || isNaN(row.unitPrice) ? 0 : row.quantity * row.unitPrice;
+                            return (
+                                <tr key={index} className={`row-${row.status}`}>
+                                    <td>
+                                        {row.status === 'error' && <ErrorIcon />}
+                                        {renderDate(row.saleDate)}
+                                    </td>
+                                    <td style={{ wordBreak: 'break-word' }}>
+                                        {row.productName || <span className="text-muted">-</span>}
+                                    </td>
+                                    <td>{renderNumber(row.quantity)}</td>
+                                    <td>{renderPrice(row.unitPrice)}</td>
+                                    <td>{renderPrice(total)}</td>
+                                    <td>
+                                        {row.status === 'newProduct' && (
+                                            <Button variant="primary" size="sm">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-plus-circle-fill me-1" viewBox="0 0 16 16">
+                                                    <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.5 4.5a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-3v-3z"/>
+                                                </svg>
+                                                Cadastrar Produto
+                                            </Button>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </Table>
+            </div>
+            
+            <div className="validation-footer">
+                <Button variant="outline-secondary" onClick={onCancel}>
+                    Voltar e Corrigir o Mapeamento
+                </Button>
+                <Button variant="primary" onClick={onConfirm}>
+                    Confirmar e Importar Tudo
+                </Button>
+            </div>
+        </div>
+    );
+};
+
+
+export default UploadPOS;

@@ -1,304 +1,676 @@
-/* --- ARQUIVO: src/assets/css/custom.css --- */
-/* --- TECNOLOGIA: CSS --- */
-/* Este arquivo contém todos os nossos estilos personalizados para dar ao aplicativo
-   uma aparência única, moderna e consistente, muitas vezes sobrescrevendo ou
-   complementando os estilos padrão da biblioteca Bootstrap. */
+/* FILE: src/assets/css/custom.css */
+/* Estilos customizados para toda a aplicação */
 
-/* Importa uma fonte mais moderna (Inter) do Google Fonts para ser usada no projeto. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-/* 1. DEFINIÇÃO DO NOSSO "DESIGN SYSTEM" COM VARIÁVEIS CSS */
-/* `:root` é um seletor que se refere ao elemento raiz do documento (o <html>).
-   Usamos ele para definir variáveis CSS globais, que podem ser reutilizadas em todo o arquivo.
-   Isso torna a manutenção do design muito mais fácil. Se quisermos mudar a cor principal,
-   só precisamos mudar em um lugar! */
+/* ========================================
+   VARIÁVEIS GLOBAIS
+   ======================================== */
 :root {
-    --primary-color: #0d6efd;      /* Cor principal (azul) */
-    --primary-hover: #0b5ed7;     /* Cor principal quando o mouse está sobre */
-    --background-light: #f8f9fa;  /* Cor de fundo clara para o conteúdo */
-    --background-sidebar: #1e293b;/* Cor de fundo escura para a barra lateral */
-    --text-color-dark: #334155;   /* Cor de texto principal (escura) */
-    --text-color-light: #f8fafc;  /* Cor de texto para fundos escuros (clara) */
-    --border-color: #e2e8f0;      /* Cor para bordas sutis */
-    --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); /* Sombra padrão para cards */
-    --border-radius: 0.5rem;      /* Raio de borda padrão para cantos arredondados */
+  --primary-color: #0d6efd;
+  --secondary-color: #6c757d;
+  --success-color: #198754;
+  --danger-color: #dc3545;
+  --warning-color: #ffc107;
+  --info-color: #0dcaf0;
+  --sidebar-width: 260px;
+  --topbar-height: 60px;
 }
 
-/* 2. ESTILOS GLOBAIS */
+/* ========================================
+   RESET E CONFIGURAÇÕES GLOBAIS
+   ======================================== */
 body {
-    background-color: var(--background-light); /* Usa a variável de cor de fundo */
-    font-family: 'Inter', sans-serif;         /* Usa a fonte que importamos */
-    color: var(--text-color-dark);            /* Usa a variável de cor de texto */
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
 }
 
-/* Estilo para o container principal da aplicação, usando flexbox para
-   colocar a sidebar e o conteúdo lado a lado. */
-.app-container {
-    display: flex;
-    width: 100%;
+#root {
+  width: 100%;
+  overflow-x: hidden;
 }
 
-/* Estilo para o container do conteúdo principal. */
-.content-container {
-    flex-grow: 1; /* Faz com que este elemento ocupe todo o espaço restante */
-    padding: 2rem; /* Adiciona um respiro interno */
-    height: 100vh; /* Altura igual à da janela */
-    overflow-y: auto; /* Adiciona uma barra de rolagem vertical se o conteúdo for muito grande */
-}
+/* ========================================
+   LAYOUT PRINCIPAL (AppLayout)
+   ======================================== */
 
-/* 3. MODERNIZAÇÃO DOS COMPONENTES BOOTSTRAP */
-/* Aqui, nós customizamos a aparência de alguns componentes do Bootstrap. */
-.card {
-    border: none; /* Remove a borda padrão do card. */
-    border-radius: var(--border-radius); /* Usa nossa variável para cantos arredondados. */
-    box-shadow: var(--card-shadow); /* Usa nossa variável de sombra. */
-}
-
-.btn-primary {
-    border-radius: var(--border-radius);
-    font-weight: 500;
-}
-
-/* 4. ESTILOS PARA O NOVO SIDEBAR */
+/* Sidebar - Estilos Base */
 .sidebar {
-    background-color: var(--background-sidebar);
-    color: var(--text-color-light);
-    min-height: 100vh; /* Garante que a sidebar sempre ocupe a altura total da tela. */
-    width: 250px;
-    padding: 1.5rem;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  height: 100vh;
+  background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%);
+  color: white;
+  padding: 1.5rem 0;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
 }
 
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+/* Título DARVIN */
+.sidebar-title {
+  padding: 0 1.5rem 1.5rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+  color: white;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 1rem;
+}
+
+/* Links da navegação */
 .sidebar .nav-link {
-    color: #cbd5e1; /* Uma cor de texto clara, mas não totalmente branca. */
-    padding: 0.75rem 1rem;
-    border-radius: var(--border-radius);
-    margin-bottom: 0.5rem;
-    display: flex; /* Para alinhar o ícone e o texto. */
-    align-items: center;
-    gap: 0.75rem; /* Espaçamento entre o ícone e o texto. */
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
 }
 
 .sidebar .nav-link:hover {
-    background-color: #334155; /* Muda o fundo ao passar o mouse. */
-    color: white;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
 }
 
-/* Estilo para o link que está ativo (correspondente à página atual). */
 .sidebar .nav-link.active {
-    background-color: var(--primary-color);
-    color: white;
-    font-weight: 600;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border-left: 4px solid white;
+  padding-left: calc(1.5rem - 4px);
 }
 
-/* ... (e assim por diante, com estilos para outras partes da UI como
-       cards de produto, interface de chat, marketplace e cards de insights) ... */
-
-
-.sidebar-title {
-    color: white;
-    font-weight: 700;
-    text-align: center;
+.sidebar .nav-link svg,
+.sidebar .nav-link i {
+  margin-right: 0.75rem;
+  font-size: 1.1rem;
+  min-width: 20px;
 }
 
-/* 5. Estilos para os Cards de Produto no PDV */
-.product-card {
-    cursor: pointer;
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+/* Submenu (dentro do collapse) */
+.sidebar #vendas-submenu {
+  background: rgba(0, 0, 0, 0.15);
+  padding: 0.5rem 0;
 }
 
-.product-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 15px -2px rgb(0 0 0 / 0.15);
+.sidebar #vendas-submenu .nav-link {
+  padding: 0.6rem 1rem 0.6rem 3rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.75);
 }
 
-.product-card-img {
-    height: 150px;
-    object-fit: cover;
-    background-color: #eee;
+.sidebar #vendas-submenu .nav-link:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
 }
 
-/* 6. Estilos para a interface de Chat ("Anota Aí") */
-.chat-container {
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - 150px);
+.sidebar #vendas-submenu .nav-link.active {
+  border-left: 3px solid rgba(255, 255, 255, 0.6);
+  padding-left: calc(3rem - 3px);
 }
 
-.message-area {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+.app-container {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
 }
 
-.message-bubble {
-    padding: 0.75rem 1.25rem;
-    border-radius: 1.25rem;
-    max-width: 75%;
-    word-wrap: break-word;
+.content-container {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  padding: 2rem;
+  background-color: #f8f9fa;
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
-.bot-message {
-    background-color: #e9ecef;
-    color: #212529;
-    align-self: flex-start;
-    border-bottom-left-radius: 0.25rem;
-}
-
-.user-message {
-    background-color: var(--primary-color);
-    color: white;
-    align-self: flex-end;
-    border-bottom-right-radius: 0.25rem;
-}
-
-.chat-input-form {
-    padding: 1rem;
-    border-top: 1px solid var(--border-color);
-}
-
-/* 7. Estilos para a Vitrine do Marketplace */
+/* ========================================
+   COMPONENTES DO MARKETPLACE
+   ======================================== */
 .category-card, .supplier-card {
-    text-align: center;
-    padding: 1.5rem 1rem;
-    cursor: pointer;
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
+  padding: 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
 }
 
 .category-card:hover, .supplier-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 15px -2px rgb(0 0 0 / 0.15);
+  border-color: var(--primary-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
 }
 
 .category-card .icon {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-    color: var(--primary-color);
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--primary-color);
 }
 
-/* 8. Estilos para os Cards do Assistente de Performance */
+/* ========================================
+   PDV TRADICIONAL
+   ======================================== */
+.product-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.product-card:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.product-card-img {
+  height: 150px;
+  object-fit: cover;
+}
+
+/* ========================================
+   ASSISTENTE DE PERFORMANCE
+   ======================================== */
 .insight-card {
-    border-left: 5px solid var(--border-color);
+  border-left: 4px solid;
+  transition: transform 0.2s ease;
 }
-.insight-card.alert-success {
-    border-left-color: #198754; /* Verde */
+
+.insight-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
-.insight-card.alert-warning {
-    border-left-color: #ffc107; /* Amarelo */
+
+.insight-card.insight-warning {
+  border-left-color: var(--warning-color);
+  background-color: #fff8e1;
 }
-.insight-card.alert-info {
-    border-left-color: #0dcaf0; /* Azul claro */
+
+.insight-card.insight-danger {
+  border-left-color: var(--danger-color);
+  background-color: #ffebee;
 }
-.insight-card .card-footer {
-    background-color: transparent;
-    border-top: 1px solid var(--border-color);
+
+.insight-card.insight-success {
+  border-left-color: var(--success-color);
+  background-color: #e8f5e9;
 }
+
+.insight-card.insight-info {
+  border-left-color: var(--info-color);
+  background-color: #e1f5fe;
+}
+
 .insight-card-metric {
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: var(--text-color-dark);
-    background-color: var(--background-light);
-    padding: 0.5rem 0.75rem;
-    border-radius: var(--border-radius);
-    display: inline-block;
-    width: 100%;
-    text-align: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary-color);
+  margin-bottom: 0;
 }
 
-.insight-card .card-footer {
-    background-color: transparent;
-    border-top: 1px solid var(--border-color);
-}
-.insight-card-metric {
-/* ... existing code ... */
-    width: 100%;
-    text-align: center;
-}
-
-/* 9. Estilos para o Carrinho do PDV (Comanda) */
-/* Define uma altura fixa para o card do carrinho, baseada na altura da janela. */
-.pos-cart {
-    height: calc(100vh - 110px);
-}
-
-/* Transforma o corpo do card em um container flexível vertical. */
-.pos-cart .card-body {
-    display: flex;
-    flex-direction: column;
-    height: 100%; /* Garante que o corpo ocupe toda a altura do card. */
-    padding: 1rem; /* Adiciona um respiro interno. */
-}
-
-/* Estiliza a área da lista de itens. */
-.pos-cart-items {
-    flex-grow: 1; /* Faz esta área crescer para ocupar todo o espaço livre. */
-    overflow-y: auto; /* Adiciona a barra de rolagem vertical quando necessário. */
-    min-height: 0; /* Correção crucial para evitar que o container "vaze" em um layout flex. */
-}
-
-/* Estiliza a área do rodapé do carrinho (total, botões, etc.). */
-.pos-cart-footer {
-    flex-shrink: 0; /* Impede que o rodapé seja "esmagado" ou encolhido. */
-    padding-top: 1rem; /* Adiciona um espaço acima do total. */
-}
-
-/* 10. Estilos para a tela de Upload de Planilha */
+/* ========================================
+   UPLOAD POS - CONTAINER PRINCIPAL
+   ======================================== */
 .upload-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-    height: 100%; /* Ocupa toda a altura disponível no content-container */
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: visible;
+  position: relative;
+}
+
+/* ========================================
+   ETAPA 1: UPLOAD DE ARQUIVO
+   ======================================== */
+.upload-step-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
 }
 
 .drop-zone {
-    width: 100%;
-    max-width: 600px;
-    border: 2px dashed var(--border-color);
-    border-radius: var(--border-radius);
-    padding: 2.5rem;
-    text-align: center;
-    cursor: pointer;
-    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+  border: 2px dashed #ccc;
+  border-radius: 12px;
+  padding: 3rem 2rem;
+  text-align: center;
+  transition: all 0.3s ease;
+  background-color: #f8f9fa;
 }
 
-.drop-zone:hover, .drop-zone.dragging {
-    background-color: #e9ecef;
-    border-color: var(--primary-color);
+.drop-zone-inner.dragging {
+  border-color: var(--primary-color);
+  background-color: #e7f1ff;
+  transform: scale(1.02);
 }
 
 .drop-zone-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-.drop-zone-icon-wrapper {
-    background-color: #e9ecef;
-    border-radius: 50%;
-    width: 64px;
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 1.5rem;
-}
-
-.drop-zone-icon {
-    color: #495057;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .btn-upload {
-    padding: 0.75rem 1.5rem;
-    font-weight: 500;
+  padding: 0.75rem 2rem;
+  font-weight: 600;
 }
 
+/* ========================================
+   ETAPA 2: MAPEAMENTO DE COLUNAS
+   ======================================== */
+.mapping-screen-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: calc(100vh - 4rem);
+  padding: 2rem 1rem;
+  overflow-x: hidden;
+  margin: -2rem -2rem -2rem -2rem;
+  border-radius: 0;
+}
+
+.mapping-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.mapping-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  color: #1a1a1a;
+}
+
+.platform-field-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.platform-field-card:hover {
+  border-color: var(--primary-color);
+  background: #e7f1ff;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+  transition: color 0.2s ease;
+}
+
+.btn-icon:hover {
+  color: var(--primary-color);
+}
+
+.mapping-field-item {
+  background: white;
+}
+
+.mapping-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mapping-select {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.mapping-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+.mapping-footer {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 2px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.verify-button {
+  padding: 0.75rem 2rem;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+/* ========================================
+   ETAPA 3: VALIDAÇÃO DE DADOS
+   ======================================== */
+.validation-container {
+  max-width: 100%;
+  width: 100%;
+  padding: 1rem;
+  margin: 0 auto;
+  overflow-x: hidden;
+}
+
+.validation-header {
+  max-width: 1200px;
+  margin: 0 auto 2rem;
+  text-align: center;
+}
+
+.validation-header h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.summary-card {
+  max-width: 1200px;
+  margin: 0 auto 2rem;
+  border: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+}
+
+.summary-count {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--success-color);
+}
+
+/* Tabela de validação - LAYOUT RESPONSIVO */
+.validation-table-container {
+  max-width: 1200px;
+  margin: 0 auto 2rem;
+  overflow-x: auto;
+  overflow-y: visible;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  background: white;
+  max-height: 600px;
+  position: relative;
+}
+
+.validation-table {
+  margin-bottom: 0;
+  min-width: 1000px;
+  font-size: 0.9rem;
+}
+
+.validation-table thead {
+  background: #f8f9fa;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.validation-table thead th {
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 2px solid #dee2e6;
+  padding: 1rem 0.75rem;
+  white-space: nowrap;
+}
+
+.validation-table tbody td {
+  padding: 1rem 0.75rem;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f3f5;
+}
+
+.validation-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.validation-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+/* Estados das linhas na validação */
+.row-valid {
+  background-color: #f0fdf4;
+  border-left: 4px solid #22c55e;
+}
+
+.row-newProduct {
+  background-color: #fffbeb;
+  border-left: 4px solid #f59e0b;
+}
+
+.row-error {
+  background-color: #fef2f2;
+  border-left: 4px solid #ef4444;
+}
+
+/* Footer de validação */
+.validation-footer {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-top: 1.5rem;
+  border-top: 2px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.validation-footer button {
+  padding: 0.75rem 2rem;
+  font-weight: 600;
+}
+
+/* Scrollbar customizada */
+.validation-table-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.validation-table-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.validation-table-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.validation-table-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* ========================================
+   RESPONSIVIDADE
+   ======================================== */
+
+/* Tablets */
+@media (max-width: 992px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar.active {
+    transform: translateX(0);
+  }
+
+  .content-container {
+    margin-left: 0;
+    padding: 1rem;
+  }
+
+  .mapping-container {
+    padding: 1.5rem;
+  }
+
+  .mapping-title {
+    font-size: 1.25rem;
+  }
+
+  .platform-field-card {
+    padding: 1rem;
+  }
+
+  .mapping-screen-bg {
+    margin: -1rem -1rem -1rem -1rem;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .validation-container {
+    padding: 0.5rem;
+  }
+
+  .validation-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .summary-count {
+    font-size: 2rem;
+  }
+
+  .validation-table {
+    font-size: 0.85rem;
+    min-width: 900px;
+  }
+
+  .validation-table thead th,
+  .validation-table tbody td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .validation-footer {
+    flex-direction: column;
+  }
+
+  .validation-footer button {
+    width: 100%;
+  }
+
+  .mapping-footer {
+    flex-direction: column;
+  }
+
+  .mapping-footer button {
+    width: 100%;
+  }
+
+  .content-container {
+    padding: 0.5rem;
+  }
+}
+
+/* Mobile Small */
+@media (max-width: 576px) {
+  .upload-step-container {
+    padding: 1rem 0.5rem;
+  }
+
+  .drop-zone {
+    padding: 2rem 1rem;
+  }
+
+  .mapping-screen-bg {
+    padding: 1rem 0.5rem;
+  }
+
+  .mapping-container {
+    padding: 1rem;
+  }
+
+  .validation-table {
+    font-size: 0.8rem;
+    min-width: 850px;
+  }
+
+  .summary-card .row {
+    font-size: 0.9rem;
+  }
+}
+
+/* ========================================
+   UTILITÁRIOS
+   ======================================== */
+.text-primary { color: var(--primary-color) !important; }
+.text-success { color: var(--success-color) !important; }
+.text-danger { color: var(--danger-color) !important; }
+.text-warning { color: var(--warning-color) !important; }
+.text-info { color: var(--info-color) !important; }
+
+/* Animações suaves */
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Melhorias de acessibilidade */
+button:focus,
+.btn:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* Garantir que cards tenham altura uniforme */
+.card.h-100 {
+  height: 100% !important;
+}
+
+/* ========================================
+   AJUSTES FINAIS PARA FULLWIDTH
+   ======================================== */
+.container-fluid {
+  max-width: 100%;
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
+/* Prevenir scroll horizontal global */
+html {
+  overflow-x: hidden;
+}
