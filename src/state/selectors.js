@@ -295,3 +295,38 @@ export const getRetailerInsights = (retailerId) => {
 
     return insights;
 };
+
+// --- NOVA FUNÇÃO ---
+// Busca detalhes de um produto específico para o card expansível
+export const getProductDetails = (retailerId, productId) => {
+    const sales = getSalesByRetailer(retailerId);
+    const inventoryItem = (getItem('inventory') || []).find(i => i.retailerId === retailerId && i.productId === productId);
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 30);
+
+    const salesInPeriod = sales.filter(s => new Date(s.dataISO) >= cutoffDate);
+    
+    let salesCount = 0;
+    let quantitySold = 0;
+    let totalRevenue = 0;
+
+    salesInPeriod.forEach(sale => {
+        const itemSold = sale.itens.find(i => i.productId === productId);
+        if (itemSold) {
+            salesCount++;
+            quantitySold += itemSold.qtde;
+            totalRevenue += itemSold.qtde * itemSold.precoUnit;
+        }
+    });
+
+    const averagePrice = quantitySold > 0 ? totalRevenue / quantitySold : 0;
+    const averageProfit = inventoryItem?.custoMedio ? averagePrice - inventoryItem.custoMedio : 0;
+
+    return {
+        salesCount,
+        quantitySold,
+        averagePrice,
+        averageProfit: averageProfit > 0 ? averageProfit : 0,
+    };
+};
