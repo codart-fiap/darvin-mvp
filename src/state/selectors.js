@@ -26,29 +26,69 @@ export const getSalesByRetailer = (retailerId) => {
 // --- FUNÇÕES ESPECÍFICAS PARA O VAREJO ---
 
 // Busca o inventário de um varejista e adiciona informações dos produtos e das marcas.
-export const getInventoryByRetailer = (retailerId) => {
-    // Pega todas as listas necessárias.
-    const inventory = getItem('inventory') || [];
-    const products = getItem('products') || [];
-    const industries = getItem('industries') || [];
+// Adicione esta versão corrigida no arquivo src/state/selectors.js
+// Substitua a função getInventoryByRetailer existente por esta:
 
-    // Filtra o inventário para pegar apenas os itens do varejista.
-    const retailerInventory = inventory.filter(item => item.retailerId === retailerId);
-    
-    // Usa `map` para transformar cada item do inventário.
-    return retailerInventory.map(item => {
-        // Para cada item, busca o produto correspondente.
-        const product = products.find(p => p.id === item.productId);
-        // E a indústria (marca) correspondente.
-        const industry = industries.find(ind => ind.id === product?.industryId);
-        // Retorna um novo objeto que combina as informações de todas as fontes.
-        return { 
-            ...product, // ...product copia todas as propriedades do produto
-            ...item,    // ...item copia todas as propriedades do item de inventário
-            marca: industry ? industry.nomeFantasia : 'Marca Desconhecida'
-        };
-    });
-}
+export const getInventoryByRetailer = (retailerId) => {
+    try {
+        const inventory = getItem('inventory') || [];
+        const products = getItem('products') || [];
+        const industries = getItem('industries') || [];
+
+        const retailerInventory = inventory.filter(item => item.retailerId === retailerId);
+        
+        return retailerInventory.map(item => {
+            // Se o item já tem os campos necessários (cadastro em massa), usa eles
+            if (item.nome && item.sku && item.categoria && item.marca) {
+                return {
+                    id: item.id,
+                    productId: item.productId,
+                    nome: item.nome,
+                    sku: item.sku,
+                    categoria: item.categoria,
+                    marca: item.marca,
+                    estoque: item.estoque || 0,
+                    custoMedio: item.custoMedio || 0,
+                    precoVenda: item.precoVenda || 0,
+                    precoSugerido: item.precoSugerido || item.precoVenda || 0,
+                    dataValidade: item.dataValidade
+                };
+            }
+            
+            // Caso contrário, busca do produto (cadastro antigo/seed)
+            const product = products.find(p => p.id === item.productId);
+            
+            if (!product) {
+                // Se não encontrou o produto, retorna estrutura básica
+                console.warn(`Produto não encontrado para inventário ${item.id}`);
+                return {
+                    id: item.id,
+                    productId: item.productId,
+                    nome: 'Produto Desconhecido',
+                    sku: item.sku || 'N/A',
+                    categoria: 'Diversos',
+                    marca: 'N/A',
+                    estoque: item.estoque || 0,
+                    custoMedio: item.custoMedio || 0,
+                    precoVenda: item.precoVenda || 0,
+                    precoSugerido: item.precoSugerido || item.precoVenda || 0,
+                    dataValidade: item.dataValidade
+                };
+            }
+            
+            const industry = industries.find(ind => ind.id === product.industryId);
+            
+            return { 
+                ...product, 
+                ...item,
+                marca: industry ? industry.nomeFantasia : (product.marca || 'Importado')
+            };
+        });
+    } catch (error) {
+        console.error('Erro ao carregar inventário:', error);
+        return [];
+    }
+};
 
 // Busca todos os clientes de um varejista.
 export const getClientsByRetailer = (retailerId) => {

@@ -11,14 +11,17 @@ import { useAuth } from '../../../hooks/useAuth';
 import { getInventoryByRetailer } from '../../../state/selectors';
 import { setItem, getItem } from '../../../state/storage';
 import { generateId } from '../../../utils/ids';
-import { Container, Button, Alert, Table, Row, Col, Form, OverlayTrigger, Tooltip, Card } from 'react-bootstrap';
+import { Container, Button, Alert, Table, Row, Col, Form, OverlayTrigger, Tooltip, Card, Modal } from 'react-bootstrap';
 
 // Definição dos campos que nossa plataforma espera.
 const PLATFORM_FIELDS = [
-    { key: 'product_name', name: 'Nome do Produto', description: 'O nome do produto vendido.', tooltip: 'Este campo deve conter o nome ou SKU do produto.' },
-    { key: 'quantity', name: 'Quantidade Vendida', description: 'A quantidade de unidades vendidas.', tooltip: 'Informe o número de unidades vendidas.' },
-    { key: 'unit_price', name: 'Preço de Venda (Unitário)', description: 'O preço de venda por unidade.', tooltip: 'O valor de venda para uma única unidade.' },
-    { key: 'sale_date', name: 'Data da Venda', description: 'A data em que a venda foi realizada.', tooltip: 'A data da transação (ex: DD/MM/AAAA).' }
+    { key: 'product_name', name: 'Nome do Produto', description: 'O nome do produto vendido.', tooltip: 'Este campo deve conter o nome ou SKU do produto.', required: true },
+    { key: 'quantity', name: 'Quantidade Vendida', description: 'A quantidade de unidades vendidas.', tooltip: 'Informe o número de unidades vendidas.', required: true },
+    { key: 'unit_price', name: 'Preço de Venda (Unitário)', description: 'O preço de venda por unidade.', tooltip: 'O valor de venda para uma única unidade.', required: true },
+    { key: 'sale_date', name: 'Data da Venda', description: 'A data em que a venda foi realizada.', tooltip: 'A data da transação (ex: DD/MM/AAAA HH:MM:SS).', required: true },
+    { key: 'transaction_id', name: 'ID da Transação', description: 'Identificador único da venda (opcional).', tooltip: 'Número do pedido ou código do recibo para agrupar itens.', required: false },
+    { key: 'unit_cost', name: 'Preço de Custo (Unitário)', description: 'Custo de aquisição do produto (opcional).', tooltip: 'Valor pago pelo produto para cálculo de lucratividade.', required: false },
+    { key: 'product_sku', name: 'SKU / Código do Produto', description: 'Código identificador do produto (opcional).', tooltip: 'Código de barras ou SKU para identificação precisa.', required: false }
 ];
 
 // --- Ícones como Componentes SVG ---
@@ -70,6 +73,46 @@ const UploadPOS = () => {
     }, []);
 
     const inventory = useMemo(() => user ? getInventoryByRetailer(user.actorId) : [], [user]);
+
+    // Função para atualizar resultados após cadastrar produto
+    const handleProductRegistered = (productData, newProduct, newInventoryItem, directUpdate = null) => {
+        // Se recebeu atualização direta (cadastro em massa), usa ela
+        if (directUpdate) {
+            setValidationResults(directUpdate);
+            return;
+        }
+
+        // Caso contrário, faz a atualização individual
+        const updatedResults = {
+            ...validationResults,
+            all: validationResults.all.map(row => 
+                row.productName === productData.productName && row.originalRow === productData.originalRow
+                    ? { 
+                        ...row, 
+                        status: 'valid', 
+                        product: {
+                            id: newInventoryItem.productId,
+                            productId: newInventoryItem.productId,
+                            sku: newInventoryItem.sku,
+                            nome: newInventoryItem.nome,
+                            categoria: newInventoryItem.categoria,
+                            marca: newInventoryItem.marca,
+                            estoque: newInventoryItem.estoque,
+                            custoMedio: newInventoryItem.custoMedio,
+                            precoVenda: newInventoryItem.precoVenda
+                        }
+                    }
+                    : row
+            )
+        };
+
+        // Recalcula as listas
+        updatedResults.valid = updatedResults.all.filter(r => r.status === 'valid');
+        updatedResults.newProduct = updatedResults.all.filter(r => r.status === 'newProduct');
+        updatedResults.error = updatedResults.all.filter(r => r.status === 'error');
+
+        setValidationResults(updatedResults);
+    };
 
     const resetForNewUpload = () => {
         setStep('upload'); 
@@ -135,20 +178,32 @@ const UploadPOS = () => {
     const handleValidation = () => {
         setError('');
         const mappedIndices = {};
-        for (const field of PLATFORM_FIELDS) {
+        
+        // Valida apenas campos obrigatórios
+        for (const field of PLATFORM_FIELDS.filter(f => f.required)) {
             if (!columnMap[field.key]) {
-                setError(`O campo "${field.name}" precisa ser mapeado.`);
+                setError(`O campo obrigatório "${field.name}" precisa ser mapeado.`);
                 return;
             }
             mappedIndices[field.key] = fileHeaders.indexOf(columnMap[field.key]);
         }
+        
+        // Mapeia campos opcionais
+        for (const field of PLATFORM_FIELDS.filter(f => !f.required)) {
+            if (columnMap[field.key]) {
+                mappedIndices[field.key] = fileHeaders.indexOf(columnMap[field.key]);
+            }
+        }
 
-        const results = { all: [], valid: [], newProduct: [], error: [] };
+        // Verifica estratégia de agrupamento
+        const hasTransactionId = mappedIndices.transaction_id !== undefined;
+        const groupingStrategy = hasTransactionId ? 'transaction_id' : 'datetime';
+
+        const results = { all: [], valid: [], newProduct: [], error: [], groupingStrategy };
         
         fileRawData.forEach((row, index) => {
-            if (row.every(cell => cell === null || cell === '' || cell === undefined)) return; // Ignora linhas vazias
+            if (row.every(cell => cell === null || cell === '' || cell === undefined)) return;
 
-            // Função auxiliar para limpar e converter valores
             const cleanValue = (value) => {
                 if (value === null || value === undefined || value === '') return null;
                 return String(value).trim();
@@ -158,20 +213,39 @@ const UploadPOS = () => {
             const quantityRaw = cleanValue(row[mappedIndices.quantity]);
             const unitPriceRaw = cleanValue(row[mappedIndices.unit_price]);
             const saleDateRaw = row[mappedIndices.sale_date];
+            
+            // Campos opcionais
+            const transactionId = mappedIndices.transaction_id !== undefined 
+                ? cleanValue(row[mappedIndices.transaction_id]) 
+                : null;
+            const unitCost = mappedIndices.unit_cost !== undefined 
+                ? cleanValue(row[mappedIndices.unit_cost]) 
+                : null;
+            const productSku = mappedIndices.product_sku !== undefined 
+                ? cleanValue(row[mappedIndices.product_sku]) 
+                : null;
 
             const saleData = {
                 productName: productNameRaw,
                 quantity: quantityRaw ? parseFloat(quantityRaw.replace(',','.')) : NaN,
                 unitPrice: unitPriceRaw ? parseFloat(unitPriceRaw.replace(',','.')) : NaN,
                 saleDate: saleDateRaw instanceof Date ? saleDateRaw : new Date(saleDateRaw),
+                transactionId: transactionId,
+                unitCost: unitCost ? parseFloat(unitCost.replace(',','.')) : null,
+                productSku: productSku,
                 originalRow: index + 2,
             };
             
             let status = 'valid';
-            let product = inventory.find(p => 
-                p.nome === saleData.productName || 
-                p.sku === saleData.productName
-            );
+            
+            // Busca produto por SKU (se fornecido) ou por nome
+            let product = null;
+            if (productSku) {
+                product = inventory.find(p => p.sku === productSku);
+            }
+            if (!product && productNameRaw) {
+                product = inventory.find(p => p.nome === productNameRaw);
+            }
 
             if (!product) status = 'newProduct';
             else if (isNaN(saleData.quantity) || saleData.quantity <= 0) status = 'error';
@@ -189,28 +263,89 @@ const UploadPOS = () => {
     
     const handleFinalImport = () => {
         const allSales = getItem('sales') || [];
-        const newSales = validationResults.valid.map(data => {
-            const total = data.quantity * data.unitPrice;
+        
+        // Agrupa as vendas válidas
+        const groupedSales = groupTransactions(validationResults.valid, validationResults.groupingStrategy);
+        
+        const newSales = groupedSales.map(group => {
+            const total = group.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+            
             return {
                 id: generateId(), 
                 retailerId: user.actorId, 
-                dataISO: data.saleDate.toISOString(),
+                dataISO: group.saleDate.toISOString(),
                 clienteId: 'consumidor_final',
-                itens: [{ 
-                    productId: data.product.id, 
-                    sku: data.product.sku, 
-                    qtde: data.quantity, 
-                    precoUnit: data.unitPrice 
-                }],
+                itens: group.items.map(item => ({
+                    productId: item.product?.productId || item.product?.id,
+                    sku: item.product?.sku || item.productSku || 'SKU-UNKNOWN',
+                    qtde: item.quantity, 
+                    precoUnit: item.unitPrice,
+                    precoCusto: item.unitCost
+                })),
                 totalBruto: total, 
                 desconto: 0, 
                 totalLiquido: total, 
-                formaPagamento: 'Upload de Planilha'
+                formaPagamento: 'Upload de Planilha',
+                transactionIdOriginal: group.transactionId
             };
-        });
+        }).filter(sale => sale !== null);
+        
+        if (newSales.length === 0) {
+            setError('Nenhuma venda válida para importar.');
+            return;
+        }
+        
         setItem('sales', [...allSales, ...newSales]);
-        alert(`${newSales.length} vendas foram registradas com sucesso!`);
+        
+        const message = validationResults.groupingStrategy === 'transaction_id'
+            ? `${newSales.length} vendas foram registradas com sucesso!`
+            : `${newSales.length} vendas foram registradas (agrupadas por data/hora).`;
+        
+        alert(message);
         resetForNewUpload();
+    };
+
+    // Função para agrupar transações
+    const groupTransactions = (validItems, strategy) => {
+        if (strategy === 'transaction_id') {
+            // Agrupa por ID de transação
+            const groups = {};
+            
+            validItems.forEach(item => {
+                const txId = item.transactionId || `AUTO-${item.saleDate.getTime()}-${Math.random()}`;
+                
+                if (!groups[txId]) {
+                    groups[txId] = {
+                        transactionId: txId,
+                        saleDate: item.saleDate,
+                        items: []
+                    };
+                }
+                
+                groups[txId].items.push(item);
+            });
+            
+            return Object.values(groups);
+        } else {
+            // Agrupa por data/hora exata (precisão de segundos)
+            const groups = {};
+            
+            validItems.forEach(item => {
+                const dateKey = item.saleDate.toISOString();
+                
+                if (!groups[dateKey]) {
+                    groups[dateKey] = {
+                        transactionId: null,
+                        saleDate: item.saleDate,
+                        items: []
+                    };
+                }
+                
+                groups[dateKey].items.push(item);
+            });
+            
+            return Object.values(groups);
+        }
     };
 
     const renderStep = () => {
@@ -229,7 +364,9 @@ const UploadPOS = () => {
                 return <ValidationStep 
                     results={validationResults} 
                     onConfirm={handleFinalImport} 
-                    onCancel={() => setStep('mapping')} 
+                    onCancel={() => setStep('mapping')}
+                    onProductRegistered={handleProductRegistered}
+                    user={user}
                 />;
             default: 
                 return <UploadStep 
@@ -372,7 +509,177 @@ const MappingStep = ({ headers, map, setMap, onVerify, onCancel, error, setError
     );
 };
 
-const ValidationStep = ({ results, onConfirm, onCancel }) => {
+const ValidationStep = ({ results, onConfirm, onCancel, onProductRegistered, user }) => {
+    const [showProductModal, setShowProductModal] = useState(false);
+    const [currentProductData, setCurrentProductData] = useState(null);
+    const [productForm, setProductForm] = useState({
+        nome: '',
+        sku: '',
+        categoria: '',
+        estoque: 0,
+        custoMedio: 0,
+        precoVenda: 0
+    });
+
+    const handleOpenProductModal = (rowData) => {
+        setCurrentProductData(rowData);
+        setProductForm({
+            nome: rowData.productName || '',
+            sku: `SKU-${Date.now()}`,
+            categoria: 'Alimentos',
+            estoque: rowData.quantity || 0,
+            custoMedio: rowData.unitPrice ? (rowData.unitPrice * 0.7).toFixed(2) : 0,
+            precoVenda: rowData.unitPrice || 0
+        });
+        setShowProductModal(true);
+    };
+
+    const handleSaveProduct = () => {
+        const allProducts = getItem('products') || [];
+        const allInventory = getItem('inventory') || [];
+        
+        const productId = generateId();
+        
+        const newProduct = {
+            id: productId,
+            sku: productForm.sku,
+            nome: productForm.nome,
+            categoria: productForm.categoria,
+            subcategoria: productForm.categoria,
+            industryId: 'generic',
+            precoSugerido: parseFloat(productForm.precoVenda),
+            supplierIds: [],
+            marca: 'Importado'
+        };
+        
+        setItem('products', [...allProducts, newProduct]);
+        
+        const validade = new Date();
+        validade.setDate(validade.getDate() + 90);
+        
+        const newInventoryItem = {
+            id: generateId(),
+            retailerId: user.actorId,
+            productId: productId,
+            nome: productForm.nome,
+            sku: productForm.sku,
+            categoria: productForm.categoria,
+            marca: 'Importado',
+            estoque: parseInt(productForm.estoque),
+            custoMedio: parseFloat(productForm.custoMedio),
+            precoVenda: parseFloat(productForm.precoVenda),
+            precoSugerido: parseFloat(productForm.precoVenda),
+            dataValidade: validade.toISOString()
+        };
+        
+        setItem('inventory', [...allInventory, newInventoryItem]);
+        
+        onProductRegistered(currentProductData, newProduct, newInventoryItem);
+        
+        setShowProductModal(false);
+    };
+
+    const handleBulkRegister = () => {
+        if (!window.confirm(`Deseja cadastrar automaticamente ${results.newProduct.length} produtos? Todos receberão valores padrão baseados na planilha.`)) {
+            return;
+        }
+
+        const allProducts = getItem('products') || [];
+        const allInventory = getItem('inventory') || [];
+        const industries = getItem('industries') || [];
+        
+        const newProducts = [];
+        const newInventoryItems = [];
+        const productDataMap = new Map();
+        
+        // Processa todos os produtos pendentes
+        results.newProduct.forEach((row) => {
+            const productId = generateId();
+            
+            const newProduct = {
+                id: productId,
+                sku: `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                nome: row.productName,
+                categoria: 'Alimentos',
+                subcategoria: 'Diversos',
+                industryId: 'generic',
+                precoSugerido: parseFloat(row.unitPrice) || 0,
+                supplierIds: [],
+                marca: 'Importado'
+            };
+            
+            const validade = new Date();
+            validade.setDate(validade.getDate() + 90);
+            
+            const newInventoryItem = {
+                id: generateId(),
+                retailerId: user.actorId,
+                productId: productId,
+                nome: row.productName,
+                sku: newProduct.sku,
+                categoria: 'Alimentos',
+                marca: 'Importado',
+                estoque: parseInt(row.quantity) || 0,
+                custoMedio: parseFloat((parseFloat(row.unitPrice) * 0.7).toFixed(2)) || 0,
+                precoVenda: parseFloat(row.unitPrice) || 0,
+                precoSugerido: parseFloat(row.unitPrice) || 0,
+                dataValidade: validade.toISOString()
+            };
+            
+            newProducts.push(newProduct);
+            newInventoryItems.push(newInventoryItem);
+            
+            // Mapeia os dados para atualização posterior
+            const key = `${row.productName}-${row.originalRow}`;
+            productDataMap.set(key, {
+                row,
+                product: { ...newProduct, ...newInventoryItem }
+            });
+        });
+        
+        // Salva todos de uma vez no localStorage
+        setItem('products', [...allProducts, ...newProducts]);
+        setItem('inventory', [...allInventory, ...newInventoryItems]);
+        
+        // Atualiza o estado uma única vez com todas as mudanças
+        const updatedResults = {
+            ...results,
+            all: results.all.map(row => {
+                const key = `${row.productName}-${row.originalRow}`;
+                if (productDataMap.has(key)) {
+                    const data = productDataMap.get(key);
+                    // Garante que o product tem o ID correto
+                    return { 
+                        ...row, 
+                        status: 'valid', 
+                        product: {
+                            id: data.product.productId,
+                            productId: data.product.productId,
+                            sku: data.product.sku,
+                            nome: data.product.nome,
+                            categoria: data.product.categoria,
+                            marca: data.product.marca,
+                            estoque: data.product.estoque,
+                            custoMedio: data.product.custoMedio,
+                            precoVenda: data.product.precoVenda
+                        }
+                    };
+                }
+                return row;
+            })
+        };
+        
+        // Recalcula as listas
+        updatedResults.valid = updatedResults.all.filter(r => r.status === 'valid');
+        updatedResults.newProduct = updatedResults.all.filter(r => r.status === 'newProduct');
+        updatedResults.error = updatedResults.all.filter(r => r.status === 'error');
+        
+        // Chama o callback do pai com os resultados atualizados diretamente
+        onProductRegistered(null, null, null, updatedResults);
+    };
+
+    const canProceed = results.newProduct.length === 0 && results.error.length === 0;
+
     const renderDate = (date) => {
         if (date instanceof Date && !isNaN(date)) {
             return date.toLocaleDateString('pt-BR');
@@ -418,6 +725,39 @@ const ValidationStep = ({ results, onConfirm, onCancel }) => {
                             <h3 className="summary-count text-danger">{results.error.length}</h3>
                         </Col>
                     </Row>
+                    
+                    {/* Alerta sobre estratégia de agrupamento */}
+                    {results.groupingStrategy === 'datetime' && (
+                        <Alert variant="info" className="mt-3 mb-0">
+                            <strong>ℹ️ Informação sobre Agrupamento:</strong> Não identificamos uma coluna de ID de transação. Para organizar os dados, as vendas que ocorreram exatamente no mesmo horário serão agrupadas em uma única compra. Por favor, verifique o resultado após a importação.
+                        </Alert>
+                    )}
+                    
+                    {!canProceed && (
+                        <>
+                            <Alert variant="warning" className="mt-3 mb-2">
+                                <strong>Atenção:</strong> Cadastre todos os produtos novos antes de prosseguir com a importação.
+                            </Alert>
+                            {results.newProduct.length > 0 && (
+                                <div className="text-center">
+                                    <Button 
+                                        variant="success" 
+                                        onClick={handleBulkRegister}
+                                        size="lg"
+                                        className="me-2"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" className="bi bi-lightning-fill me-2" viewBox="0 0 16 16">
+                                            <path d="M5.52.359A.5.5 0 0 1 6 0h4a.5.5 0 0 1 .474.658L8.694 6H12.5a.5.5 0 0 1 .395.807l-7 9a.5.5 0 0 1-.873-.454L6.823 9.5H3.5a.5.5 0 0 1-.48-.641l2.5-8.5z"/>
+                                        </svg>
+                                        Cadastrar Todos os {results.newProduct.length} Produtos
+                                    </Button>
+                                    <small className="text-muted d-block mt-2">
+                                        Ou cadastre individualmente clicando no botão de cada linha
+                                    </small>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </Card.Body>
             </Card>
 
@@ -450,12 +790,15 @@ const ValidationStep = ({ results, onConfirm, onCancel }) => {
                                     <td>{renderPrice(total)}</td>
                                     <td>
                                         {row.status === 'newProduct' && (
-                                            <Button variant="primary" size="sm">
+                                            <Button variant="primary" size="sm" onClick={() => handleOpenProductModal(row)}>
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-plus-circle-fill me-1" viewBox="0 0 16 16">
                                                     <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.5 4.5a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-3v-3z"/>
                                                 </svg>
                                                 Cadastrar Produto
                                             </Button>
+                                        )}
+                                        {row.status === 'valid' && (
+                                            <span className="text-success small">✓ Pronto</span>
                                         )}
                                     </td>
                                 </tr>
@@ -469,10 +812,132 @@ const ValidationStep = ({ results, onConfirm, onCancel }) => {
                 <Button variant="outline-secondary" onClick={onCancel}>
                     Voltar e Corrigir o Mapeamento
                 </Button>
-                <Button variant="primary" onClick={onConfirm}>
-                    Confirmar e Importar Tudo
+                <Button 
+                    variant="primary" 
+                    onClick={onConfirm}
+                    disabled={!canProceed}
+                >
+                    Confirmar e Importar ({results.valid.length} vendas)
                 </Button>
             </div>
+
+            {/* Modal de Cadastro de Produto */}
+            <Modal show={showProductModal} onHide={() => setShowProductModal(false)} size="lg">
+                <Modal.Header closeButton>
+                    <Modal.Title>Cadastrar Novo Produto</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Alert variant="info">
+                        Preencha os dados do produto. Alguns campos foram preenchidos automaticamente com base na planilha.
+                    </Alert>
+                    <Form>
+                        <Row>
+                            <Col md={8}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Nome do Produto *</Form.Label>
+                                    <Form.Control 
+                                        type="text" 
+                                        value={productForm.nome}
+                                        onChange={(e) => setProductForm({...productForm, nome: e.target.value})}
+                                        required
+                                    />
+                                </Form.Group>
+                            </Col>
+                            <Col md={4}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>SKU *</Form.Label>
+                                    <Form.Control 
+                                        type="text" 
+                                        value={productForm.sku}
+                                        onChange={(e) => setProductForm({...productForm, sku: e.target.value})}
+                                        required
+                                    />
+                                </Form.Group>
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col md={4}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Categoria *</Form.Label>
+                                    <Form.Select 
+                                        value={productForm.categoria}
+                                        onChange={(e) => setProductForm({...productForm, categoria: e.target.value})}
+                                    >
+                                        <option value="Alimentos">Alimentos</option>
+                                        <option value="Bebidas">Bebidas</option>
+                                        <option value="Limpeza">Limpeza</option>
+                                        <option value="Higiene">Higiene</option>
+                                    </Form.Select>
+                                </Form.Group>
+                            </Col>
+                            <Col md={4}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Estoque Inicial *</Form.Label>
+                                    <Form.Control 
+                                        type="number" 
+                                        value={productForm.estoque}
+                                        onChange={(e) => setProductForm({...productForm, estoque: e.target.value})}
+                                        min="0"
+                                        required
+                                    />
+                                </Form.Group>
+                            </Col>
+                            <Col md={4}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Custo Médio *</Form.Label>
+                                    <Form.Control 
+                                        type="number" 
+                                        step="0.01"
+                                        value={productForm.custoMedio}
+                                        onChange={(e) => setProductForm({...productForm, custoMedio: e.target.value})}
+                                        min="0"
+                                        required
+                                    />
+                                </Form.Group>
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Preço de Venda *</Form.Label>
+                                    <Form.Control 
+                                        type="number" 
+                                        step="0.01"
+                                        value={productForm.precoVenda}
+                                        onChange={(e) => setProductForm({...productForm, precoVenda: e.target.value})}
+                                        min="0"
+                                        required
+                                    />
+                                </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Margem de Lucro</Form.Label>
+                                    <Form.Control 
+                                        type="text" 
+                                        value={productForm.custoMedio > 0 
+                                            ? `${(((productForm.precoVenda - productForm.custoMedio) / productForm.custoMedio) * 100).toFixed(2)}%`
+                                            : '0%'}
+                                        disabled
+                                    />
+                                </Form.Group>
+                            </Col>
+                        </Row>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowProductModal(false)}>
+                        Cancelar
+                    </Button>
+                    <Button 
+                        variant="primary" 
+                        onClick={handleSaveProduct}
+                        disabled={!productForm.nome || !productForm.sku}
+                    >
+                        Cadastrar e Continuar
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </div>
     );
 };

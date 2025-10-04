@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getInventoryByRetailer } from '../../state/selectors';
 import { getItem, setItem } from '../../state/storage';
-import { Container, Table, Button, Modal, Form, Row, Col, Card, Badge } from 'react-bootstrap';
+import { Container, Table, Button, Modal, Form, Row, Col, Card, Badge, Alert } from 'react-bootstrap';
 
 const Inventory = () => {
   const { user } = useAuth();
@@ -14,22 +14,41 @@ const Inventory = () => {
   const [modalType, setModalType] = useState('entrada');
   const [adjustmentValue, setAdjustmentValue] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (user) {
-      setInventoryItems(getInventoryByRetailer(user.actorId));
+      try {
+        console.log('Carregando inventário para:', user.actorId);
+        const items = getInventoryByRetailer(user.actorId);
+        console.log('Itens carregados:', items);
+        setInventoryItems(items);
+      } catch (err) {
+        console.error('ERRO ao carregar inventário:', err);
+        setError(err.message);
+      }
     }
   }, [user]);
 
   const filteredItems = useMemo(() => {
-    return inventoryItems.filter(item => {
+    try {
+      return inventoryItems.filter(item => {
         const categoryMatch = categoryFilter === 'all' || item.categoria === categoryFilter;
         return categoryMatch;
-    });
+      });
+    } catch (err) {
+      console.error('ERRO ao filtrar items:', err);
+      return [];
+    }
   }, [inventoryItems, categoryFilter]);
 
   const uniqueCategories = useMemo(() => {
-    return [...new Set(inventoryItems.map(item => item.categoria))].sort();
+    try {
+      return [...new Set(inventoryItems.map(item => item.categoria || 'Diversos'))].sort();
+    } catch (err) {
+      console.error('ERRO ao extrair categorias:', err);
+      return ['Diversos'];
+    }
   }, [inventoryItems]);
 
   const handleOpenModal = (item, type) => {
@@ -47,30 +66,57 @@ const Inventory = () => {
   const handleUpdateStock = () => {
     if (!currentItem) return;
 
-    const allInventory = getItem('inventory') || [];
-    const updatedInventory = allInventory.map(invItem => {
-      if (invItem.id === currentItem.id) {
-        const currentValue = invItem.estoque;
-        const newValue = parseInt(adjustmentValue, 10);
+    try {
+      const allInventory = getItem('inventory') || [];
+      const updatedInventory = allInventory.map(invItem => {
+        if (invItem.id === currentItem.id) {
+          const currentValue = invItem.estoque;
+          const newValue = parseInt(adjustmentValue, 10);
 
-        if (modalType === 'entrada') {
-          return { ...invItem, estoque: currentValue + newValue };
-        } else {
-          return { ...invItem, estoque: newValue };
+          if (modalType === 'entrada') {
+            return { ...invItem, estoque: currentValue + newValue };
+          } else {
+            return { ...invItem, estoque: newValue };
+          }
         }
-      }
-      return invItem;
-    });
+        return invItem;
+      });
 
-    setItem('inventory', updatedInventory);
-    setInventoryItems(getInventoryByRetailer(user.actorId));
-    handleCloseModal();
+      setItem('inventory', updatedInventory);
+      setInventoryItems(getInventoryByRetailer(user.actorId));
+      handleCloseModal();
+    } catch (err) {
+      console.error('ERRO ao atualizar estoque:', err);
+      alert('Erro ao atualizar estoque: ' + err.message);
+    }
   };
 
-  const formatDate = (dateString) => new Date(dateString).toLocaleDateString('pt-BR');
+  const formatDate = (dateString) => {
+    try {
+      if (!dateString) return 'N/A';
+      return new Date(dateString).toLocaleDateString('pt-BR');
+    } catch (err) {
+      return 'N/A';
+    }
+  };
 
   if (!user) {
-    return <div>Carregando...</div>;
+    return <Container><p>Carregando...</p></Container>;
+  }
+
+  if (error) {
+    return (
+      <Container>
+        <Alert variant="danger">
+          <Alert.Heading>Erro ao carregar estoque</Alert.Heading>
+          <p>{error}</p>
+          <hr />
+          <p className="mb-0">
+            Abra o Console do navegador (F12) para ver detalhes do erro.
+          </p>
+        </Alert>
+      </Container>
+    );
   }
 
   return (
@@ -89,6 +135,11 @@ const Inventory = () => {
                 </Form.Select>
               </Form.Group>
             </Col>
+            <Col md={8} className="d-flex align-items-end">
+              <small className="text-muted">
+                Total de itens: {filteredItems.length}
+              </small>
+            </Col>
           </Row>
         </Card.Body>
       </Card>
@@ -99,7 +150,7 @@ const Inventory = () => {
             <tr>
               <th>SKU</th>
               <th>Produto</th>
-              <th>Marca</th> {/* <-- COLUNA ADICIONADA */}
+              <th>Marca</th>
               <th className="text-center">Estoque Atual</th>
               <th>Custo Médio</th>
               <th>Preço Venda</th>
@@ -109,40 +160,73 @@ const Inventory = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredItems.map(item => (
-              <tr key={item.id}>
-                <td><small>{item.sku}</small></td>
-                <td>{item.nome}</td>
-                <td><small className="text-muted">{item.marca}</small></td> {/* <-- DADO ADICIONADO */}
-                <td className="text-center"><Badge bg="primary" pill className="p-2 fs-6">{item.estoque}</Badge></td>
-                <td>{item.custoMedio ? `R$ ${item.custoMedio.toFixed(2)}` : 'N/A'}</td>
-                <td>{item.precoVenda ? `R$ ${item.precoVenda.toFixed(2)}` : 'N/A'}</td>
-                <td>
-                  {item.precoVenda && item.custoMedio ? (
-                    <span className="text-success fw-bold">
-                      R$ {(item.precoVenda - item.custoMedio).toFixed(2)}
-                    </span>
-                  ) : 'N/A'}
-                </td>
-                <td>{item.dataValidade ? formatDate(item.dataValidade) : 'N/A'}</td>
-                <td>
-                  <Button variant="success" size="sm" className="me-2" onClick={() => handleOpenModal(item, 'entrada')}>Entrada</Button>
-                  <Button variant="warning" size="sm" onClick={() => handleOpenModal(item, 'ajuste')}>Ajuste</Button>
+            {filteredItems.length === 0 ? (
+              <tr>
+                <td colSpan="9" className="text-center text-muted">
+                  Nenhum produto no estoque
                 </td>
               </tr>
-            ))}
+            ) : (
+              filteredItems.map((item, index) => {
+                try {
+                  return (
+                    <tr key={item.id || index}>
+                      <td><small>{item.sku || 'N/A'}</small></td>
+                      <td>{item.nome || 'Produto sem nome'}</td>
+                      <td><small className="text-muted">{item.marca || 'N/A'}</small></td>
+                      <td className="text-center">
+                        <Badge bg="primary" pill className="p-2 fs-6">
+                          {item.estoque ?? 0}
+                        </Badge>
+                      </td>
+                      <td>{item.custoMedio ? `R$ ${parseFloat(item.custoMedio).toFixed(2)}` : 'N/A'}</td>
+                      <td>{item.precoVenda ? `R$ ${parseFloat(item.precoVenda).toFixed(2)}` : 'N/A'}</td>
+                      <td>
+                        {item.precoVenda && item.custoMedio ? (
+                          <span className="text-success fw-bold">
+                            R$ {(parseFloat(item.precoVenda) - parseFloat(item.custoMedio)).toFixed(2)}
+                          </span>
+                        ) : 'N/A'}
+                      </td>
+                      <td>{formatDate(item.dataValidade)}</td>
+                      <td>
+                        <Button variant="success" size="sm" className="me-2" onClick={() => handleOpenModal(item, 'entrada')}>
+                          Entrada
+                        </Button>
+                        <Button variant="warning" size="sm" onClick={() => handleOpenModal(item, 'ajuste')}>
+                          Ajuste
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                } catch (err) {
+                  console.error('ERRO ao renderizar item:', item, err);
+                  return (
+                    <tr key={index}>
+                      <td colSpan="9" className="text-danger">
+                        Erro ao exibir produto (ver console)
+                      </td>
+                    </tr>
+                  );
+                }
+              })
+            )}
           </tbody>
         </Table>
       </Card>
 
       <Modal show={showModal} onHide={handleCloseModal}>
         <Modal.Header closeButton>
-          <Modal.Title>{modalType === 'entrada' ? 'Registrar Entrada' : 'Ajustar Estoque'} de {currentItem?.nome}</Modal.Title>
+          <Modal.Title>
+            {modalType === 'entrada' ? 'Registrar Entrada' : 'Ajustar Estoque'} de {currentItem?.nome}
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <p>Estoque Atual: <strong>{currentItem?.estoque}</strong></p>
+          <p>Estoque Atual: <strong>{currentItem?.estoque ?? 0}</strong></p>
           <Form.Group>
-            <Form.Label>{modalType === 'entrada' ? 'Quantidade a Adicionar' : 'Novo Valor do Estoque'}</Form.Label>
+            <Form.Label>
+              {modalType === 'entrada' ? 'Quantidade a Adicionar' : 'Novo Valor do Estoque'}
+            </Form.Label>
             <Form.Control 
               type="number" 
               value={adjustmentValue}
