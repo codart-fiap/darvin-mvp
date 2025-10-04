@@ -13,8 +13,6 @@ import {
     HouseDoorFill, 
     CartFill, 
     BoxSeam, 
-    Shop, 
-    WalletFill, 
     AwardFill, 
     GearFill, 
     ChevronDown, 
@@ -70,8 +68,6 @@ const Sidebar = () => {
       </Collapse>
 
       <SidebarLink to="/retail/inventory" icon={<BoxSeam />}>Estoque</SidebarLink>
-      <SidebarLink to="/retail/marketplace" icon={<Shop />}>Marketplace</SidebarLink>
-      <SidebarLink to="/retail/conecta" icon={<WalletFill />}>Darvin Conecta</SidebarLink>
       <SidebarLink to="/retail/programs" icon={<AwardFill />}>Programas</SidebarLink>
       <SidebarLink to="/retail/settings" icon={<GearFill />}>Configurações</SidebarLink>
     </>

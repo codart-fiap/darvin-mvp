@@ -1,31 +1,45 @@
-// FILE: src/pages/auth/Login.jsx
-import React, { useState } from 'react';
+// --- ARQUIVO: src/pages/auth/Login.jsx ---
+
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { getActorsByType } from '../../state/selectors'; // ✅ Importa a nova função
 import { Container, Form, Button, Alert, Card } from 'react-bootstrap';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState('retail'); // 'retail' como padrão
+  // ✅ Estados de email e senha removidos
+  const [role, setRole] = useState('retail');
+  const [actors, setActors] = useState([]); // ✅ Estado para a lista de estabelecimentos
+  const [selectedActorId, setSelectedActorId] = useState(''); // ✅ Estado para o estabelecimento selecionado
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login } = useAuth(); // A função `login` agora é a nova versão
+
+  // ✅ Efeito que busca os estabelecimentos sempre que o "role" muda
+  useEffect(() => {
+    const actorData = getActorsByType(role);
+    setActors(actorData);
+    setSelectedActorId(''); // Limpa a seleção anterior
+  }, [role]);
+
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
 
-    const user = login(email, password, role);
+    if (!selectedActorId) {
+        setError('Por favor, selecione um estabelecimento para continuar.');
+        return;
+    }
+
+    // ✅ Chama a nova função de login, passando o ID do estabelecimento e o perfil
+    const user = login(selectedActorId, role);
 
     if (user) {
       // Redireciona para o dashboard correspondente
       switch (user.role) {
         case 'retail':
           navigate('/retail/dashboard');
-          break;
-        case 'supplier':
-          navigate('/supplier/dashboard');
           break;
         case 'industry':
           navigate('/industry/dashboard');
@@ -34,7 +48,7 @@ const Login = () => {
           navigate('/');
       }
     } else {
-      setError('Credenciais inválidas ou tipo de usuário incorreto.');
+      setError('Não foi possível fazer login. Nenhum usuário encontrado para este estabelecimento.');
     }
   };
 
@@ -45,26 +59,37 @@ const Login = () => {
           <h2 className="text-center mb-4">DARVIN MVP</h2>
           {error && <Alert variant="danger">{error}</Alert>}
           <Form onSubmit={handleSubmit}>
+            {/* 1. SELETOR DE TIPO DE USUÁRIO */}
             <Form.Group id="role" className="mb-3">
-              <Form.Label>Tipo de Usuário</Form.Label>
+              <Form.Label>1. Selecione o tipo de perfil</Form.Label>
               <Form.Select value={role} onChange={(e) => setRole(e.target.value)}>
                 <option value="retail">Varejo/Comércio</option>
-                <option value="supplier">Fornecedor</option>
                 <option value="industry">Indústria</option>
               </Form.Select>
             </Form.Group>
 
-            <Form.Group id="email" className="mb-3">
-              <Form.Label>Usuário (email)</Form.Label>
-              <Form.Control type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            {/* 2. SELETOR DE ESTABELECIMENTO */}
+            <Form.Group id="actor" className="mb-3">
+              <Form.Label>2. Selecione o estabelecimento</Form.Label>
+              <Form.Select 
+                value={selectedActorId} 
+                onChange={(e) => setSelectedActorId(e.target.value)}
+                disabled={actors.length === 0} // Desabilitado se não houver opções
+              >
+                <option value="">Selecione...</option>
+                {actors.map(actor => (
+                  <option key={actor.id} value={actor.id}>
+                    {actor.nomeFantasia}
+                  </option>
+                ))}
+              </Form.Select>
             </Form.Group>
 
-            <Form.Group id="password"  className="mb-3">
-              <Form.Label>Senha</Form.Label>
-              <Form.Control type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            </Form.Group>
+            {/* Campos de email e senha foram removidos */}
 
-            <Button className="w-100" type="submit">Entrar</Button>
+            <Button className="w-100" type="submit" disabled={!selectedActorId}>
+              Entrar
+            </Button>
           </Form>
         </Card.Body>
       </Card>
