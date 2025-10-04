@@ -5,6 +5,7 @@ import logoBoreal from '../assets/images/logos/logoBoreal.png';
 import logoDoceVida from '../assets/images/logos/logoDoceVida.png';
 import logoLimpMax from '../assets/images/logos/logoLimpMax.png';
 import logoBelezaPura from '../assets/images/logos/logoBelezaPura.png';
+
 export const seedDatabase = () => {
   console.log("🌱 Populando o localStorage com dados EXPANDIDOS...");
 
@@ -12,25 +13,25 @@ export const seedDatabase = () => {
   const industries = [
     {
       id: 'ind1', nomeFantasia: 'Boreal Bebidas S.A.', razaoSocial: 'Boreal Bebidas S.A.', cnpj: '11.111.111/0001-11',
-      logo: logoBoreal, // <-- VÍRGULA ADICIONADA
+      logo: logoBoreal,
       endereco: { logradouro: 'Av. Polar, 100', bairro: 'Centro', cidade: 'Campinas', uf: 'SP', cep: '13010-000' },
       linhaAtuacao: 'Bebidas', contato: { telefone: '19 4002-8922', email: 'bi@borealbebidas.com' }, premium: true
     },
     {
       id: 'ind2', nomeFantasia: 'DoceVida Alimentos', razaoSocial: 'DoceVida Indústria Alimentícia Ltda.', cnpj: '22.222.222/0001-22',
-      logo: logoDoceVida, // <-- VÍRGULA ADICIONADA
+      logo: logoDoceVida,
       endereco: { logradouro: 'Rua das Glicínias, 250', bairro: 'Jardim Doce', cidade: 'Valinhos', uf: 'SP', cep: '13270-000' },
       linhaAtuacao: 'Alimentos', contato: { telefone: '19 3322-4455', email: 'contato@docevida.com' }, premium: false
     },
     {
       id: 'ind3', nomeFantasia: 'LimpMax Produtos', razaoSocial: 'LimpMax Indústria e Comércio Ltda.', cnpj: '33.444.555/0001-66',
-      logo: logoLimpMax, // <-- VÍRGULA ADICIONADA
+      logo: logoLimpMax,
       endereco: { logradouro: 'Av. Industrial, 777', bairro: 'Polo Industrial', cidade: 'Jundiaí', uf: 'SP', cep: '13200-000' },
       linhaAtuacao: 'Limpeza', contato: { telefone: '11 3300-5566', email: 'vendas@limpmax.com' }, premium: true
     },
     {
       id: 'ind4', nomeFantasia: 'BelezaPura Cosméticos', razaoSocial: 'BelezaPura Ind. Cosméticos S.A.', cnpj: '44.555.666/0001-77',
-      logo: logoBelezaPura, // <-- VÍRGULA ADICIONADA
+      logo: logoBelezaPura,
       endereco: { logradouro: 'Rua das Flores, 333', bairro: 'Jardim Aroma', cidade: 'São Paulo', uf: 'SP', cep: '04567-000' },
       linhaAtuacao: 'Higiene Pessoal', contato: { telefone: '11 2200-4433', email: 'contato@belezapura.com' }, premium: false
     },
@@ -220,30 +221,30 @@ export const seedDatabase = () => {
   console.log(`✅ ${products.length} produtos criados`);
 
   // --- 5. CLIENTES ---
-  const nomesClientes = [
-    "João Silva", "Maria Santos", "Pedro Oliveira", "Ana Costa", "Carlos Souza",
-    "Fernanda Lima", "Lucas Alves", "Mariana Rocha", "José Pereira", "Patrícia Mendes",
-    "Rafael Cardoso", "Beatriz Martins", "Paulo Ribeiro", "Carla Ferreira", "André Castro",
-    "Roberta Gomes", "Gustavo Barbosa", "Larissa Dias", "Fábio Araújo", "Juliana Moreira"
-  ];
-
   const clients = [];
+  const nomesMasculinos = ["João", "Pedro", "Carlos", "Lucas", "José", "Rafael", "Paulo", "André", "Gustavo", "Fábio"];
+  const nomesFemininos = ["Maria", "Ana", "Fernanda", "Mariana", "Patrícia", "Beatriz", "Carla", "Roberta", "Larissa", "Juliana"];
+  const sobrenomes = ["Silva", "Santos", "Oliveira", "Costa", "Souza", "Lima", "Alves", "Rocha", "Pereira", "Mendes"];
+  const habitos = ["Compra Semanal", "Fim de Semana", "Noturno", "Ocasional", "Promocional"];
+
   retailers.forEach(r => {
-    // Cliente padrão
-    clients.push({ 
-      id: 'consumidor_final', 
-      retailerId: r.id, 
-      nome: 'Consumidor Final' 
-    });
+    clients.push({ id: 'consumidor_final', retailerId: r.id, nome: 'Consumidor Final' });
     
-    // Clientes nomeados
     for (let i = 0; i < 20; i++) {
-      const nome = nomesClientes[Math.floor(Math.random() * nomesClientes.length)];
-      clients.push({ 
-        id: generateId(), 
-        retailerId: r.id, 
-        nome: `${nome}` 
-      });
+        const sexo = Math.random() > 0.5 ? 'Masculino' : 'Feminino';
+        const nome = sexo === 'Masculino' 
+            ? nomesMasculinos[Math.floor(Math.random() * nomesMasculinos.length)]
+            : nomesFemininos[Math.floor(Math.random() * nomesFemininos.length)];
+        const sobrenome = sobrenomes[Math.floor(Math.random() * sobrenomes.length)];
+        
+        clients.push({ 
+            id: generateId(), 
+            retailerId: r.id, 
+            nome: `${nome} ${sobrenome}`,
+            sexo: sexo,
+            idade: Math.floor(Math.random() * 50) + 18, // 18 a 67 anos
+            habitoCompra: habitos[Math.floor(Math.random() * habitos.length)]
+        });
     }
   });
 
@@ -292,10 +293,10 @@ export const seedDatabase = () => {
   for (let i = 0; i < 2000; i++) {
     const retailer = retailers[Math.floor(Math.random() * retailers.length)];
     const retailerInventory = inventory.filter(inv => inv.retailerId === retailer.id && inv.estoque > 0);
+    const retailerClients = clients.filter(c => c.retailerId === retailer.id);
     
     if (retailerInventory.length === 0) continue;
 
-    // Define quantos itens a venda terá (1 a 5)
     const qtdeItens = Math.floor(Math.random() * 5) + 1;
     const itensVenda = [];
     let totalBruto = 0;
@@ -303,7 +304,6 @@ export const seedDatabase = () => {
     for (let j = 0; j < qtdeItens; j++) {
       let itemToSell;
       
-      // 70% de chance de vender produtos populares
       if (Math.random() < 0.7) {
         const popularItems = retailerInventory.filter(inv => 
           products.find(p => p.id === inv.productId)?.popular
@@ -313,12 +313,11 @@ export const seedDatabase = () => {
         }
       }
       
-      // Fallback para produto aleatório
       if (!itemToSell) {
         itemToSell = retailerInventory[Math.floor(Math.random() * retailerInventory.length)];
       }
 
-      const qtde = Math.floor(Math.random() * 4) + 1; // 1 a 4 unidades
+      const qtde = Math.floor(Math.random() * 4) + 1;
       
       itensVenda.push({ 
         productId: itemToSell.productId, 
@@ -330,21 +329,17 @@ export const seedDatabase = () => {
       totalBruto += itemToSell.precoVenda * qtde;
     }
 
-    // Desconto aleatório em compras acima de R$ 80
     const desconto = totalBruto > 80 
-      ? +(totalBruto * (Math.random() * 0.08)).toFixed(2) // Até 8% de desconto
+      ? +(totalBruto * (Math.random() * 0.08)).toFixed(2)
       : 0;
 
     const formaPagamento = formasPagamento[Math.floor(Math.random() * formasPagamento.length)];
-    
-    // Data aleatória nos últimos 180 dias
     const saleDate = new Date();
     const daysAgo = Math.floor(Math.random() * 180);
     saleDate.setDate(saleDate.getDate() - daysAgo);
 
-    // Vendas maiores nos fins de semana
     if (saleDate.getDay() === 0 || saleDate.getDay() === 6) {
-      if (Math.random() < 0.4) { // 40% de chance de item extra
+      if (Math.random() < 0.4) {
         const extraItem = retailerInventory[Math.floor(Math.random() * retailerInventory.length)];
         itensVenda.push({ 
           productId: extraItem.productId, 
@@ -356,11 +351,15 @@ export const seedDatabase = () => {
       }
     }
 
+    const cliente = Math.random() > 0.4 
+        ? retailerClients[Math.floor(Math.random() * retailerClients.length)].id
+        : 'consumidor_final';
+
     sales.push({
       id: generateId(),
       retailerId: retailer.id,
       dataISO: saleDate.toISOString(),
-      clienteId: 'consumidor_final',
+      clienteId: cliente,
       itens: itensVenda,
       totalBruto: +totalBruto.toFixed(2),
       desconto: desconto,
@@ -369,44 +368,45 @@ export const seedDatabase = () => {
     });
   }
 
-
- // --- 8. PROGRAMAS DE INCENTIVO ---
-
+  // --- 8. PROGRAMAS DE INCENTIVO ---
    const programs = [
     {
       id: 'prog1',
-      industryId: 'ind1', // Boreal Bebidas
+      industryId: 'ind1',
       title: 'Campanha "Verão Refrescante"',
+      tags: ['Desafio de Vendas', 'Bebidas'],
       description: 'Aumente suas vendas de refrigerantes e sucos e ganhe bônus em dinheiro.',
-      rules: 'Para participar, você deve aumentar em 20% o volume de vendas (em litros) de todos os refrigerantes e sucos da Boreal em comparação com os 30 dias anteriores ao início da campanha.',
+      rules: 'Para participar, você deve aumentar em 20% o volume de vendas (em unidades) de todos os refrigerantes e sucos da Boreal em comparação com os 30 dias anteriores ao início da campanha.',
       reward: 'Bonificação de R$ 300,00 creditada na sua conta.',
       startDate: '2025-10-01T00:00:00.000Z',
       endDate: '2025-12-31T23:59:59.000Z',
       metric: {
-        type: 'volume_venda_categoria',
+        type: 'percentual_venda_categoria',
         categories: ['Refrigerantes', 'Sucos'],
         target: 1.20 // Aumento de 20%
       }
     },
     {
       id: 'prog2',
-      industryId: 'ind2', // DoceVida Alimentos
+      industryId: 'ind2',
       title: 'Campanha "Doce Prateleira"',
+      tags: ['Bônus por Compra', 'Alimentos'],
       description: 'Compre uma quantidade específica de biscoitos e ganhe unidades grátis.',
       rules: 'A cada 10 caixas de qualquer biscoito DoceVida compradas, você ganha 1 caixa do Biscoito Recheado de Chocolate grátis no próximo pedido.',
-      reward: '1 caixa de Biscoito Recheado Chocolate grátis a cada 10 caixas compradas.',
+      reward: '1 caixa de Biscoito Recheado Chocolate grátis.',
       startDate: '2025-09-15T00:00:00.000Z',
       endDate: '2025-11-15T23:59:59.000Z',
        metric: {
-        type: 'volume_compra_categoria', // Este tipo precisaria de dados de compra, que não temos. Simplificaremos na UI por enquanto.
+        type: 'volume_compra_categoria',
         categories: ['Biscoitos'],
-        target: 10 // 10 caixas
+        target: 10
       }
     },
      {
       id: 'prog3',
-      industryId: 'ind3', // LimpMax
+      industryId: 'ind3',
       title: 'Faxina Premiada LimpMax',
+      tags: ['Desafio de Vendas', 'Limpeza'],
       description: 'Venda o novo Sabão em Pó LimpMax e concorra a prêmios.',
       rules: 'Venda 50 unidades do Sabão em Pó LimpMax 1kg durante o período da campanha para se qualificar.',
       reward: 'Um kit exclusivo de produtos LimpMax avaliado em R$ 200,00.',
@@ -414,18 +414,30 @@ export const seedDatabase = () => {
       endDate: '2025-11-30T23:59:59.000Z',
       metric: {
         type: 'volume_venda_sku',
-        sku: 'LMP0004', // SKU do Sabão em Pó LimpMax 1kg
-        target: 50 // 50 unidades
+        sku: 'LMP0004',
+        target: 50
+      }
+    },
+    {
+      id: 'prog4',
+      industryId: 'ind4', // BelezaPura
+      title: 'Lançamento BelezaPura Hidratação',
+      tags: ['Lançamento', 'Higiene'],
+      description: 'Compre e venda a nova linha de Shampoos e Condicionadores para ganhar visibilidade extra.',
+      rules: 'Compre no mínimo 10 unidades do Shampoo e 10 do Condicionador da linha Hidratação e venda pelo menos 5 de cada.',
+      reward: 'Sua loja será destacada em nossas redes sociais como um ponto de venda oficial.',
+      startDate: '2025-11-01T00:00:00.000Z',
+      endDate: '2025-12-15T23:59:59.000Z',
+      metric: {
+        type: 'mix_produtos',
+        skus: { 'HIG0005': 5, 'HIG0006': 5 },
+        target: 1
       }
     }
   ];
 
   // --- 9. INSCRIÇÕES NOS PROGRAMAS ---
-  // Estrutura para armazenar qual varejista aderiu a qual programa
-  const programSubscriptions = [
-      // Exemplo: { retailerId: 'ret1', programId: 'prog1', date: '2025-10-02T10:00:00.000Z' }
-  ];
-
+  const programSubscriptions = [];
 
   // --- 10. SALVANDO TUDO ---
   setItem('users', users);
@@ -435,10 +447,9 @@ export const seedDatabase = () => {
   setItem('clients', clients);
   setItem('inventory', inventory);
   setItem('sales', sales);
-  setItem('programs', programs); // <-- ADICIONADO
-  setItem('programSubscriptions', programSubscriptions); // <-- ADICIONADO
-  setItem('settings', {})
+  setItem('programs', programs);
+  setItem('programSubscriptions', programSubscriptions);
+  setItem('settings', {});
 
-
-    console.log(`✅ ${sales.length} vendas criadas`);
+  console.log(`✅ ${sales.length} vendas criadas`);
 };

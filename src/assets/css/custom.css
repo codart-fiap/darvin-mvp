@@ -317,3 +317,31 @@ body {
 .program-card .card-footer {
     background-color: #f8f9fa; /* Um cinza bem claro para destacar */
 }
+
+/* --- ADICIONAR AO FINAL DE src/assets/css/custom.css --- */
+
+/* 11. ESTILOS PARA OS CARDS DE PROGRAMAS DE INCENTIVO (ATUALIZADO) */
+.program-card {
+    transition: all 0.3s ease-in-out;
+}
+
+.program-card .program-logo {
+    max-height: 60px;
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+.program-card .card-footer {
+    background-color: #f8f9fa; /* Um cinza bem claro para destacar */
+}
+
+/* 12. ESTILOS PARA A PÁGINA DE PROGRAMAS E RATING */
+.nav-tabs .nav-link {
+    color: var(--text-color-dark);
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--primary-color);
+    font-weight: 600;
+}

@@ -1,18 +1,14 @@
 // --- ARQUIVO ATUALIZADO: src/pages/retail/pos/TraditionalPOS.jsx ---
-// --- TECNOLOGIA: React, JSX, JavaScript, React-Bootstrap ---
-
-// --- 1. IMPORTAÇÕES ---
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import { getInventoryByRetailer, getClientsByRetailer } from '../../../state/selectors';
 import { setItem, getItem } from '../../../state/storage';
 import { generateId } from '../../../utils/ids';
-import { Container, Row, Col, Form, Button, Table, Card, InputGroup, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Form, Button, Table, Card, InputGroup, Alert, Modal } from 'react-bootstrap';
+import { PlusCircleFill } from 'react-bootstrap-icons';
 
-// --- 2. DEFINIÇÃO DO COMPONENTE ---
 const TraditionalPOS = () => {
   
-  // --- 3. HOOKS E ESTADOS ---
   const { user } = useAuth();
   const [cart, setCart] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -21,8 +17,12 @@ const TraditionalPOS = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Estados para o modal de novo cliente
+  const [showNewClientModal, setShowNewClientModal] = useState(false);
+  const [newClient, setNewClient] = useState({ nome: '', sexo: 'Prefiro não informar', idade: '' });
+  const [clientList, setClientList] = useState(() => user ? getClientsByRetailer(user.actorId) : []);
+
   const inventory = useMemo(() => user ? getInventoryByRetailer(user.actorId) : [], [user]);
-  const clients = useMemo(() => user ? getClientsByRetailer(user.actorId) : [], [user]);
   
   const searchResults = useMemo(() => {
     const itemsInStock = inventory.filter(item => item.estoque > 0);
@@ -33,7 +33,6 @@ const TraditionalPOS = () => {
     );
   }, [searchTerm, inventory]);
 
-  // --- 4. FUNÇÕES DE LÓGICA ---
   const addToCart = (product) => {
     const existingItem = cart.find(item => item.productId === product.productId);
     if (existingItem) {
@@ -51,12 +50,8 @@ const TraditionalPOS = () => {
   const cartTotal = cart.reduce((total, item) => total + (item.precoUnit * item.qtde), 0);
 
   const handleFinalizeSale = () => {
-    if (cart.length === 0) {
-        setError('O carrinho está vazio.'); return;
-    }
-    if (!selectedClient) {
-        setError('Por favor, selecione um cliente.'); return;
-    }
+    if (cart.length === 0) { setError('O carrinho está vazio.'); return; }
+    if (!selectedClient) { setError('Por favor, selecione um cliente.'); return; }
 
     const newSale = {
       id: generateId(), retailerId: user.actorId, dataISO: new Date().toISOString(), clienteId: selectedClient,
@@ -84,12 +79,33 @@ const TraditionalPOS = () => {
     setSelectedClient('');
     setError('');
   };
+
+  const handleSaveNewClient = () => {
+      if (!newClient.nome || !newClient.idade) {
+          // Adicionar validação se necessário
+          return;
+      }
+      const allClients = getItem('clients') || [];
+      const clientData = {
+          id: generateId(),
+          retailerId: user.actorId,
+          ...newClient,
+          idade: Number(newClient.idade),
+          habitoCompra: 'Ocasional' // Padrão
+      };
+
+      const updatedClients = [...allClients, clientData];
+      setItem('clients', updatedClients);
+      setClientList(updatedClients.filter(c => c.retailerId === user.actorId));
+      setSelectedClient(clientData.id); // Seleciona o novo cliente
+      setShowNewClientModal(false);
+      setNewClient({ nome: '', sexo: 'Prefiro não informar', idade: '' });
+  };
   
   if (!user) {
     return <Container><p>Carregando PDV...</p></Container>;
   }
 
-  // --- 5. RENDERIZAÇÃO ---
   return (
     <Container fluid>
         <Row>
@@ -109,7 +125,6 @@ const TraditionalPOS = () => {
                     {searchResults.map(item => (
                         <Col xl={3} lg={4} md={6} key={item.id} className="mb-3">
                             <Card className="product-card h-100" onClick={() => addToCart(item)}>
-                                {/* --- ALTERAÇÃO AQUI --- */}
                                 <Card.Img 
                                     variant="top" 
                                     src={item.logo || `https://via.placeholder.com/200x150/EEEEEE/999999?text=${item.sku}`} 
@@ -143,13 +158,7 @@ const TraditionalPOS = () => {
                         
                         <div className="pos-cart-items">
                             <Table hover>
-                                <thead>
-                                    <tr>
-                                        <th>Item</th>
-                                        <th>Qtd</th>
-                                        <th>Subtotal</th>
-                                    </tr>
-                                </thead>
+                                <thead><tr><th>Item</th><th>Qtd</th><th>Subtotal</th></tr></thead>
                                 <tbody>
                                     {cart.map(item => (
                                         <tr key={item.productId}>
@@ -167,10 +176,15 @@ const TraditionalPOS = () => {
                             <hr/>
                             <Form.Group className="mb-3">
                                 <Form.Label>Cliente</Form.Label>
-                                <Form.Select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)}>
-                                    <option value="">Selecione...</option>
-                                    {clients.map(client => <option key={client.id} value={client.id}>{client.nome}</option>)}
-                                </Form.Select>
+                                <InputGroup>
+                                    <Form.Select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)}>
+                                        <option value="">Selecione...</option>
+                                        {clientList.map(client => <option key={client.id} value={client.id}>{client.nome}</option>)}
+                                    </Form.Select>
+                                    <Button variant="outline-secondary" onClick={() => setShowNewClientModal(true)}>
+                                        <PlusCircleFill/>
+                                    </Button>
+                                </InputGroup>
                             </Form.Group>
                             <Form.Group className="mb-3">
                                 <Form.Label>Forma de Pagamento</Form.Label>
@@ -187,6 +201,41 @@ const TraditionalPOS = () => {
                 </Card>
             </Col>
         </Row>
+
+        {/* Modal de Novo Cliente */}
+        <Modal show={showNewClientModal} onHide={() => setShowNewClientModal(false)} centered>
+            <Modal.Header closeButton><Modal.Title>Cadastrar Novo Cliente</Modal.Title></Modal.Header>
+            <Modal.Body>
+                <Form>
+                    <Form.Group className="mb-3">
+                        <Form.Label>Nome Completo</Form.Label>
+                        <Form.Control type="text" value={newClient.nome} onChange={(e) => setNewClient({...newClient, nome: e.target.value})} autoFocus/>
+                    </Form.Group>
+                    <Row>
+                        <Col>
+                            <Form.Group className="mb-3">
+                                <Form.Label>Idade</Form.Label>
+                                <Form.Control type="number" value={newClient.idade} onChange={(e) => setNewClient({...newClient, idade: e.target.value})}/>
+                            </Form.Group>
+                        </Col>
+                        <Col>
+                            <Form.Group className="mb-3">
+                                <Form.Label>Sexo</Form.Label>
+                                <Form.Select value={newClient.sexo} onChange={(e) => setNewClient({...newClient, sexo: e.target.value})}>
+                                    <option>Prefiro não informar</option>
+                                    <option>Feminino</option>
+                                    <option>Masculino</option>
+                                </Form.Select>
+                            </Form.Group>
+                        </Col>
+                    </Row>
+                </Form>
+            </Modal.Body>
+            <Modal.Footer>
+                <Button variant="secondary" onClick={() => setShowNewClientModal(false)}>Cancelar</Button>
+                <Button variant="primary" onClick={handleSaveNewClient}>Salvar Cliente</Button>
+            </Modal.Footer>
+        </Modal>
     </Container>
   );
 };

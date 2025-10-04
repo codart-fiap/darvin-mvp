@@ -1,6 +1,8 @@
 // --- ARQUIVO ATUALIZADO: src/state/selectors.js ---
 import { getItem } from './storage';
-import { differenceInDays } from 'date-fns';
+import { differenceInDays, subDays } from 'date-fns';
+import { calculateRating } from '../utils/rating'; // <-- IMPORTA A LÓGICA DE RATING
+
 
 // Busca todos os atores (varejistas ou indústrias)
 export const getActorsByType = (actorType) => {
@@ -37,7 +39,7 @@ export const getInventoryByRetailer = (retailerId) => {
             ...product,
             ...item,
             marca: industry ? industry.nomeFantasia : 'Marca Desconhecida',
-            logo: industry ? industry.logo : null, // <-- ADICIONADO
+            logo: industry ? industry.logo : null,
             lote: item.lote
         };
     });
@@ -88,34 +90,25 @@ export const parseTextToCart = (text, inventory) => {
     return { items: cartItems, notFound: notFound };
 }
 
-// --------------------
-// SELECTORS APRIMORADOS
-// --------------------
-
-// Monta os dados de Dashboard do Varejista (AGORA COM FILTRO DE DATA E CATEGORIA)
+// Monta os dados de Dashboard do Varejista
 export const getDashboardData = (retailerId, days = 30, categoryFilter = null, dateFilter = null) => {
     const sales = getSalesByRetailer(retailerId);
     const products = getItem('products') || [];
     const industries = getItem('industries') || [];
 
-    // Filtra por período
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
     let periodSales = sales.filter(s => new Date(s.dataISO) >= cutoffDate);
     let filteredSales = periodSales;
 
-    // >>> NOVO: Aplica o filtro de data se ele existir <<<
     if (dateFilter) {
-        // Converte a data do filtro (DD/MM) para um formato comparável
         const [day, month] = dateFilter.split('/');
         filteredSales = periodSales.filter(sale => {
             const saleDate = new Date(sale.dataISO);
-            // Compara dia e mês da venda com o filtro
             return saleDate.getDate() === parseInt(day, 10) && (saleDate.getMonth() + 1) === parseInt(month, 10);
         });
     }
     
-    // Aplica o filtro de categoria se ele existir (pode ser combinado com o de data)
     if (categoryFilter) {
         filteredSales = filteredSales.map(sale => {
             const filteredItems = sale.itens.filter(item => {
@@ -130,12 +123,10 @@ export const getDashboardData = (retailerId, days = 30, categoryFilter = null, d
         }).filter(Boolean);
     }
 
-    // KPIs (calculados sobre as vendas filtradas)
     const numberOfSales = filteredSales.length;
     const totalRevenue = filteredSales.reduce((sum, s) => sum + s.totalLiquido, 0);
     const averageTicket = numberOfSales > 0 ? totalRevenue / numberOfSales : 0;
 
-    // Receita por dia (gráfico não é afetado pelos filtros para manter o contexto)
     const salesByDayMap = {};
     periodSales.forEach(s => {
         const day = new Date(s.dataISO).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' });
@@ -143,7 +134,6 @@ export const getDashboardData = (retailerId, days = 30, categoryFilter = null, d
     });
     const salesByDay = Object.keys(salesByDayMap).map(d => ({ name: d, Receita: salesByDayMap[d] }));
 
-    // Receita por categoria (gráfico não é afetado pelos filtros para manter o contexto)
     const revenueByCategoryMap = {};
     periodSales.forEach(s => {
         s.itens.forEach(i => {
@@ -156,7 +146,6 @@ export const getDashboardData = (retailerId, days = 30, categoryFilter = null, d
     });
     const revenueByCategory = Object.keys(revenueByCategoryMap).map(c => ({ name: c, Receita: revenueByCategoryMap[c] }));
 
-    // Top 5 produtos (afetado por ambos os filtros)
     const productSalesMap = {};
     filteredSales.forEach(s => {
         s.itens.forEach(i => {
@@ -181,35 +170,27 @@ export const getDashboardData = (retailerId, days = 30, categoryFilter = null, d
     };
 };
 
-
-// Insights do Assistente de Performance (VERSÃO CORRIGIDA E MELHORADA)
+// Insights do Assistente de Performance
 export const getRetailerInsights = (retailerId) => {
     const today = new Date();
     const insights = [];
     
-    // --- Dados Base ---
     const dashboardData30Days = getDashboardData(retailerId, 30);
     const inventory = getInventoryByRetailer(retailerId);
     
-    // --- INSIGHT 1: Alerta de Estoque Baixo para Produtos Populares ---
     const topProducts = dashboardData30Days.tables.top5Products;
     if (topProducts.length > 0) {
         const topProductInventory = inventory.find(i => i.productId === topProducts[0].productId);
         if (topProductInventory && topProductInventory.estoque < 10) {
             insights.push({ 
-                id: "insight-low-stock",
-                type: "warning", 
-                icon: "ExclamationCircle", 
-                title: "Estoque baixo do campeão de vendas",
+                id: "insight-low-stock", type: "warning", icon: "ExclamationCircle", title: "Estoque baixo do campeão de vendas",
                 description: `O produto "${topProducts[0].name}" está acabando! Considere fazer um novo pedido para não perder vendas.`,
-                metric: `Apenas ${topProductInventory.estoque} un. restantes`,
-                text: `Estoque baixo: ${topProducts[0].name} (${topProductInventory.estoque} un.)`,
+                metric: `Apenas ${topProductInventory.estoque} un. restantes`, text: `Estoque baixo: ${topProducts[0].name} (${topProductInventory.estoque} un.)`,
                 action: { text: "Ver Estoque", link: "/retail/inventory" }
             });
         }
     }
     
-    // --- INSIGHT 2: Alerta de Produtos Próximos da Validade ---
     const expiringSoon = inventory.find(item => 
         item.dataValidade && 
         differenceInDays(new Date(item.dataValidade), today) <= 15 &&
@@ -218,18 +199,13 @@ export const getRetailerInsights = (retailerId) => {
     if (expiringSoon) {
         const daysLeft = differenceInDays(new Date(expiringSoon.dataValidade), today);
         insights.push({ 
-            id: "insight-expiring-soon",
-            type: "warning", 
-            icon: "GraphDownArrow", 
-            title: "Produto perto de vencer",
+            id: "insight-expiring-soon", type: "warning", icon: "GraphDownArrow", title: "Produto perto de vencer",
             description: `Atenção ao produto "${expiringSoon.nome}". Crie uma promoção ou um combo para girar o estoque e evitar perdas.`,
-            metric: `Vence em ${daysLeft} dias`,
-            text: `Perto de vencer: ${expiringSoon.nome} (em ${daysLeft} dias)`,
+            metric: `Vence em ${daysLeft} dias`, text: `Perto de vencer: ${expiringSoon.nome} (em ${daysLeft} dias)`,
             action: { text: "Ver Estoque", link: "/retail/inventory" }
         });
     }
 
-    // --- INSIGHT 3: Alerta de Estoque Parado ---
     const salesLast30Days = dashboardData30Days.raw.sales.flatMap(s => s.itens);
     const slowMovingItem = inventory.find(item => 
         item.estoque > 50 && 
@@ -238,18 +214,13 @@ export const getRetailerInsights = (retailerId) => {
 
     if (slowMovingItem) {
         insights.push({ 
-            id: "insight-slow-moving",
-            type: "info", 
-            icon: "BoxSeam", 
-            title: "Estoque parado",
+            id: "insight-slow-moving", type: "info", icon: "BoxSeam", title: "Estoque parado",
             description: `O produto "${slowMovingItem.nome}" não teve vendas no último mês e possui um estoque alto. Que tal dar um destaque a ele na loja?`,
-            metric: `${slowMovingItem.estoque} un. em estoque`,
-            text: `Estoque parado: ${slowMovingItem.nome} (${slowMovingItem.estoque} un.)`,
+            metric: `${slowMovingItem.estoque} un. em estoque`, text: `Estoque parado: ${slowMovingItem.nome} (${slowMovingItem.estoque} un.)`,
             action: { text: "Ver Detalhes", link: "/retail/inventory" }
         });
     }
 
-    // --- INSIGHT 4: Produto Mais Lucrativo ---
     const profitability = {};
     salesLast30Days.forEach(soldItem => {
         const inventoryItem = inventory.find(i => i.productId === soldItem.productId);
@@ -265,27 +236,18 @@ export const getRetailerInsights = (retailerId) => {
     const mostProfitable = Object.values(profitability).sort((a,b) => b.totalProfit - a.totalProfit)[0];
     if (mostProfitable && mostProfitable.totalProfit > 100) {
         insights.push({ 
-            id: "insight-most-profitable",
-            type: "success", 
-            icon: "GraphUpArrow", 
-            title: "Sua mina de ouro!",
+            id: "insight-most-profitable", type: "success", icon: "GraphUpArrow", title: "Sua mina de ouro!",
             description: `O produto "${mostProfitable.name}" foi o que mais gerou lucro líquido no último mês. Invista na visibilidade dele!`,
-            metric: `+ R$ ${mostProfitable.totalProfit.toFixed(2)} de lucro`,
-            text: `Sua mina de ouro: ${mostProfitable.name} (+ R$ ${mostProfitable.totalProfit.toFixed(2)} de lucro)`,
+            metric: `+ R$ ${mostProfitable.totalProfit.toFixed(2)} de lucro`, text: `Sua mina de ouro: ${mostProfitable.name} (+ R$ ${mostProfitable.totalProfit.toFixed(2)} de lucro)`,
             action: { text: "Ver Dashboard", link: "/retail/dashboard" }
         });
     }
 
-    // --- Fallback ---
     if (insights.length === 0) {
         insights.push({
-            id: "insight-none",
-            type: "neutral",
-            icon: "ExclamationCircle",
-            title: "Nenhum insight relevante",
+            id: "insight-none", type: "neutral", icon: "ExclamationCircle", title: "Nenhum insight relevante",
             description: "Não encontramos insights significativos no período. Continue registrando suas vendas e movimentações.",
-            metric: "Continue registrando",
-            text: "Nenhum insight relevante no momento.",
+            metric: "Continue registrando", text: "Nenhum insight relevante no momento.",
             action: { text: "Registrar Venda", link: "/retail/pos/traditional" }
         });
     }
@@ -293,7 +255,6 @@ export const getRetailerInsights = (retailerId) => {
     return insights;
 };
 
-// --- NOVA FUNÇÃO ---
 // Busca detalhes de um produto específico para o card expansível
 export const getProductDetails = (retailerId, productId) => {
     const sales = getSalesByRetailer(retailerId);
@@ -304,9 +265,7 @@ export const getProductDetails = (retailerId, productId) => {
 
     const salesInPeriod = sales.filter(s => new Date(s.dataISO) >= cutoffDate);
     
-    let salesCount = 0;
-    let quantitySold = 0;
-    let totalRevenue = 0;
+    let salesCount = 0, quantitySold = 0, totalRevenue = 0;
 
     salesInPeriod.forEach(sale => {
         const itemSold = sale.itens.find(i => i.productId === productId);
@@ -320,15 +279,10 @@ export const getProductDetails = (retailerId, productId) => {
     const averagePrice = quantitySold > 0 ? totalRevenue / quantitySold : 0;
     const averageProfit = inventoryItem?.custoMedio ? averagePrice - inventoryItem.custoMedio : 0;
 
-    return {
-        salesCount,
-        quantitySold,
-        averagePrice,
-        averageProfit: averageProfit > 0 ? averageProfit : 0,
-    };
-}; // <-- CHAVE DE FECHAMENTO QUE FALTAVA
+    return { salesCount, quantitySold, averagePrice, averageProfit: averageProfit > 0 ? averageProfit : 0 };
+};
 
-// --- NOVO SELECTOR PARA PROGRAMAS ---
+// --- SELECTOR DE PROGRAMAS APRIMORADO ---
 export const getProgramsForRetailer = (retailerId) => {
     const programs = getItem('programs') || [];
     const industries = getItem('industries') || [];
@@ -339,16 +293,44 @@ export const getProgramsForRetailer = (retailerId) => {
     return programs.map(program => {
         const industry = industries.find(i => i.id === program.industryId);
         const subscription = subscriptions.find(s => s.retailerId === retailerId && s.programId === program.id);
+        const isCompleted = new Date() > new Date(program.endDate);
 
         let progress = { current: 0, target: 0, percentage: 0 };
 
         if (subscription) {
+            const programStartDate = new Date(program.startDate);
+            const programEndDate = new Date(program.endDate);
             const programSales = sales.filter(s => {
                 const saleDate = new Date(s.dataISO);
-                return saleDate >= new Date(program.startDate) && saleDate <= new Date(program.endDate);
+                return saleDate >= programStartDate && saleDate <= programEndDate;
             });
+            
+            // Lógica para crescimento percentual
+            if (program.metric.type === 'percentual_venda_categoria') {
+                const baseStartDate = subDays(programStartDate, 30);
+                const baseSales = sales.filter(s => {
+                     const saleDate = new Date(s.dataISO);
+                     return saleDate >= baseStartDate && saleDate < programStartDate;
+                });
+                
+                const getVolume = (salesList) => salesList.reduce((acc, sale) => {
+                    return acc + sale.itens.reduce((itemAcc, item) => {
+                        const product = products.find(p => p.id === item.productId);
+                        if(product && program.metric.categories.includes(product.subcategoria)) {
+                            return itemAcc + item.qtde;
+                        }
+                        return itemAcc;
+                    }, 0);
+                }, 0);
 
-            if (program.metric.type === 'volume_venda_sku') {
+                const baseVolume = getVolume(baseSales);
+                const currentVolume = getVolume(programSales);
+                
+                progress.target = Math.ceil(baseVolume * program.metric.target);
+                progress.current = currentVolume;
+            }
+            // Lógica para volume de SKU
+            else if (program.metric.type === 'volume_venda_sku') {
                 progress.target = program.metric.target;
                 programSales.forEach(sale => {
                     sale.itens.forEach(item => {
@@ -358,21 +340,8 @@ export const getProgramsForRetailer = (retailerId) => {
                     });
                 });
             }
-            // OBS: A lógica para 'volume_venda_categoria' com % de aumento é mais complexa
-            // e precisaria de um histórico de vendas anterior.
-            // Por simplicidade, vamos tratar como uma meta de unidades vendidas.
-            else if (program.metric.type === 'volume_venda_categoria') {
-                 progress.target = 200; // Meta de exemplo: Vender 200 unidades
-                 programSales.forEach(sale => {
-                    sale.itens.forEach(item => {
-                        const product = products.find(p => p.id === item.productId);
-                        if (product && program.metric.categories.includes(product.subcategoria)) {
-                             progress.current += item.qtde;
-                        }
-                    });
-                });
-            }
-             if (progress.target > 0) {
+            
+            if (progress.target > 0) {
                 progress.percentage = Math.min(Math.round((progress.current / progress.target) * 100), 100);
             }
         }
@@ -382,7 +351,14 @@ export const getProgramsForRetailer = (retailerId) => {
             industryName: industry?.nomeFantasia,
             industryLogo: industry?.logo,
             isSubscribed: !!subscription,
-            progress: progress
+            isCompleted,
+            progress
         };
     });
+};
+
+// --- NOVO SELECTOR DE RATING ---
+export const getRetailerRating = (retailerId) => {
+    const sales = getSalesByRetailer(retailerId);
+    return calculateRating(sales);
 };
