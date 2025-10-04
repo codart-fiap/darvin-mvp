@@ -1,18 +1,10 @@
 // --- ARQUIVO: src/state/seed.js ---
-// --- TECNOLOGIA: JavaScript ---
-// Este arquivo é o "semeador" do nosso banco de dados.
-// Sua função é criar um conjunto completo de dados falsos (mock data) para que o aplicativo
-// tenha informações para mostrar assim que for iniciado pela primeira vez.
-// Isso é essencial para desenvolver e testar sem precisar de um banco de dados real.
-
 import { setItem } from './storage';
 import { generateId } from '../utils/ids';
 
-// A função principal que será chamada para popular o banco de dados.
 export const seedDatabase = () => {
   console.log("Populando o localStorage com dados iniciais...");
 
-  // --- 1. Atores (Indústrias, Varejos) ---
   const industries = [
     {
       id: 'ind1', nomeFantasia: 'Boreal Bebidas S.A.', razaoSocial: 'Boreal Bebidas S.A.', cnpj: '11.111.111/0001-11',
@@ -39,14 +31,12 @@ export const seedDatabase = () => {
     },
   ];
 
-  // --- 2. Usuários ---
   const users = [
     { id: generateId(), email: 'ana@mercearia.com', password: '123', role: 'retail', actorId: 'ret1', displayName: 'Ana (Bom Preço)' },
     { id: generateId(), email: 'bruno@mercadocentral.com', password: '123', role: 'retail', actorId: 'ret2', displayName: 'Bruno (Central)' },
     { id: generateId(), email: 'bi@borealbebidas.com', password: '123', role: 'industry', actorId: 'ind1', displayName: 'BI (Boreal)' },
   ];
 
-  // --- 3. Produtos (100 SKUs fixos) ---
   const products = [];
   const bebidas = [
     ["Refrigerante Boreal Cola 2L", "Refrigerantes", 8.50], ["Refrigerante Boreal Guaraná 2L", "Refrigerantes", 8.50],
@@ -64,10 +54,7 @@ export const seedDatabase = () => {
   alimentos.forEach((p, i) => products.push({
     id: generateId(), sku: `ALI-${i+1}`.padStart(7,"0"), nome: p[0], categoria: "Alimentos", subcategoria: p[1], industryId: "ind2", precoSugerido: p[2]
   }));
-  
-  // (As seções de limpeza e higiene podem ser adicionadas aqui se necessário)
 
-  // --- 4. Clientes ---
   let clients = [];
   retailers.forEach(r => {
     for (let i = 1; i <= 15; i++) {
@@ -75,10 +62,9 @@ export const seedDatabase = () => {
     }
   });
 
-  // --- 5. Estoque ---
   let inventory = [];
   retailers.forEach(r => {
-    const sample = products.sort(() => 0.5 - Math.random()).slice(0, 8); // Ajustado para pegar menos produtos
+    const sample = products.sort(() => 0.5 - Math.random()).slice(0, 8);
     sample.forEach(p => {
       const validade = new Date();
       validade.setDate(validade.getDate() + Math.floor(Math.random() * 180));
@@ -90,7 +76,6 @@ export const seedDatabase = () => {
     });
   });
 
-  // --- 6. Vendas ---
   let sales = [];
   for (let i = 0; i < 400; i++) {
     const retailer = retailers[Math.floor(Math.random() * retailers.length)];
@@ -117,7 +102,6 @@ export const seedDatabase = () => {
     sales.push(sale);
   }
   
-  // --- Salvando ---
   setItem('users', users); 
   setItem('retailers', retailers); 
   setItem('industries', industries);

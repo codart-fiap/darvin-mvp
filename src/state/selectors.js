@@ -1,31 +1,25 @@
 // --- ARQUIVO: src/state/selectors.js ---
 // --- TECNOLOGIA: JavaScript ---
-// Este arquivo é um conjunto de "seletores". Pense neles como "consultas" pré-prontas
-// para o nosso banco de dados (localStorage). Em vez de repetir a lógica de busca e
-// filtragem em vários lugares, nós a centralizamos aqui. Isso torna o código mais
-// organizado e fácil de manter.
 
-// Importamos a função `getItem` para poder ler os dados.
 import { getItem } from './storage';
 
-// ✅ NOVA FUNÇÃO: Busca todos os atores (estabelecimentos) de um determinado tipo.
+// ✅ CORREÇÃO APLICADA AQUI
+// A função agora busca pela chave correta ("retailers" ou "industries").
 export const getActorsByType = (actorType) => {
-    const items = getItem(`${actorType}s`); // ex: 'retail' + 's' = 'retailers'
+    const key = actorType === 'retail' ? 'retailers' : 'industries';
+    const items = getItem(key);
     return items || [];
 }
 
 // Busca os dados de um "ator" (varejista, etc.) específico pelo seu ID.
 export const getActorData = (actorId, actorType) => {
-    // Pega a lista completa do tipo de ator (ex: 'retailers').
     const items = getItem(`${actorType}s`);
-    // Usa `find` para encontrar o primeiro item na lista cujo `id` corresponde ao que procuramos.
     return items?.find(item => item.id === actorId) || null;
 }
 
 // Busca todas as vendas de um varejista específico.
 export const getSalesByRetailer = (retailerId) => {
     const sales = getItem('sales') || [];
-    // Usa `filter` para criar uma nova lista apenas com as vendas que pertencem a esse varejista.
     return sales.filter(s => s.retailerId === retailerId);
 }
 
@@ -33,24 +27,18 @@ export const getSalesByRetailer = (retailerId) => {
 
 // Busca o inventário de um varejista e adiciona informações dos produtos e das marcas.
 export const getInventoryByRetailer = (retailerId) => {
-    // Pega todas as listas necessárias.
     const inventory = getItem('inventory') || [];
     const products = getItem('products') || [];
     const industries = getItem('industries') || [];
 
-    // Filtra o inventário para pegar apenas os itens do varejista.
     const retailerInventory = inventory.filter(item => item.retailerId === retailerId);
     
-    // Usa `map` para transformar cada item do inventário.
     return retailerInventory.map(item => {
-        // Para cada item, busca o produto correspondente.
         const product = products.find(p => p.id === item.productId);
-        // E a indústria (marca) correspondente.
         const industry = industries.find(ind => ind.id === product?.industryId);
-        // Retorna um novo objeto que combina as informações de todas as fontes.
         return { 
-            ...product, // ...product copia todas as propriedades do produto
-            ...item,    // ...item copia todas as propriedades do item de inventário
+            ...product,
+            ...item,
             marca: industry ? industry.nomeFantasia : 'Marca Desconhecida'
         };
     });
@@ -130,7 +118,7 @@ export const getDashboardData = (retailerId, periodInDays) => {
     };
 }
     
-// Converte um texto de linguagem natural (ex: "vendi 2 cafés") em itens de carrinho.
+// Converte um texto de linguagem natural em itens de carrinho.
 export const parseTextToCart = (text, inventory) => {
     const cleanedText = text.toLowerCase().replace(/vendi/g, '').trim();
     const parts = cleanedText.split(/ e |,| e,|, e/);
