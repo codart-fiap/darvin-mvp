@@ -18,7 +18,8 @@ import {
     ChevronDown, 
     ChatDotsFill, 
     Upload,
-    LightbulbFill // Ícone para o Assistente.
+    LightbulbFill, // Ícone para o Assistente.
+    FileEarmarkSpreadsheetFill // <-- ÍCONE ADICIONADO
 } from 'react-bootstrap-icons';
 // Importamos nosso hook de autenticação para saber o tipo de usuário logado.
 import { useAuth } from '../hooks/useAuth';
@@ -64,6 +65,8 @@ const Sidebar = () => {
           <SidebarLink to="/retail/pos/traditional" icon={<CartFill />}>PDV Tradicional</SidebarLink>
           <SidebarLink to="/retail/pos/chatbot" icon={<ChatDotsFill />}>"Anota Aí"</SidebarLink>
           <SidebarLink to="/retail/pos/upload" icon={<Upload />}>Upload de Planilha</SidebarLink>
+          {/* v-- LINK ADICIONADO --v */}
+          <SidebarLink to="/retail/pos/online-sheet" icon={<FileEarmarkSpreadsheetFill />}>Planilha Online</SidebarLink>
         </div>
       </Collapse>
 

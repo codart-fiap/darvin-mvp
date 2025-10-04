@@ -13,6 +13,7 @@ import DashboardRetail from './pages/retail/DashboardRetail';
 import TraditionalPOS from './pages/retail/pos/TraditionalPOS';
 import ChatbotPOS from './pages/retail/pos/ChatbotPOS';
 import UploadPOS from './pages/retail/pos/UploadPOS';
+import OnlineSheetPOS from './pages/retail/pos/OnlineSheetPOS'; // <-- ADICIONADO
 import Inventory from './pages/retail/Inventory';
 import Programs from './pages/retail/Programs';
 import SettingsRetail from './pages/retail/SettingsRetail';
@@ -39,6 +40,7 @@ function App() {
           <Route path="/retail/pos/traditional" element={<TraditionalPOS />} />
           <Route path="/retail/pos/chatbot" element={<ChatbotPOS />} />
           <Route path="/retail/pos/upload" element={<UploadPOS />} />
+          <Route path="/retail/pos/online-sheet" element={<OnlineSheetPOS />} /> {/* <-- ADICIONADO */}
           <Route path="/retail/inventory" element={<Inventory />} />
           {/* A ROTA PARA O CONECTA FOI REMOVIDA DAQUI */}
           <Route path="/retail/programs" element={<Programs />} />
