@@ -302,3 +302,18 @@ body {
     font-weight: 500;
 }
 
+/* 11. ESTILOS PARA OS CARDS DE PROGRAMAS DE INCENTIVO */
+.program-card {
+    transition: all 0.3s ease-in-out;
+}
+
+.program-card .program-logo {
+    max-height: 50px;
+    width: auto;
+    max-width: 150px;
+    object-fit: contain;
+}
+
+.program-card .card-footer {
+    background-color: #f8f9fa; /* Um cinza bem claro para destacar */
+}

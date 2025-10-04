@@ -369,9 +369,65 @@ export const seedDatabase = () => {
     });
   }
 
-  console.log(`✅ ${sales.length} vendas criadas`);
 
-  // --- 8. SALVANDO TUDO ---
+ // --- 8. PROGRAMAS DE INCENTIVO ---
+
+   const programs = [
+    {
+      id: 'prog1',
+      industryId: 'ind1', // Boreal Bebidas
+      title: 'Campanha "Verão Refrescante"',
+      description: 'Aumente suas vendas de refrigerantes e sucos e ganhe bônus em dinheiro.',
+      rules: 'Para participar, você deve aumentar em 20% o volume de vendas (em litros) de todos os refrigerantes e sucos da Boreal em comparação com os 30 dias anteriores ao início da campanha.',
+      reward: 'Bonificação de R$ 300,00 creditada na sua conta.',
+      startDate: '2025-10-01T00:00:00.000Z',
+      endDate: '2025-12-31T23:59:59.000Z',
+      metric: {
+        type: 'volume_venda_categoria',
+        categories: ['Refrigerantes', 'Sucos'],
+        target: 1.20 // Aumento de 20%
+      }
+    },
+    {
+      id: 'prog2',
+      industryId: 'ind2', // DoceVida Alimentos
+      title: 'Campanha "Doce Prateleira"',
+      description: 'Compre uma quantidade específica de biscoitos e ganhe unidades grátis.',
+      rules: 'A cada 10 caixas de qualquer biscoito DoceVida compradas, você ganha 1 caixa do Biscoito Recheado de Chocolate grátis no próximo pedido.',
+      reward: '1 caixa de Biscoito Recheado Chocolate grátis a cada 10 caixas compradas.',
+      startDate: '2025-09-15T00:00:00.000Z',
+      endDate: '2025-11-15T23:59:59.000Z',
+       metric: {
+        type: 'volume_compra_categoria', // Este tipo precisaria de dados de compra, que não temos. Simplificaremos na UI por enquanto.
+        categories: ['Biscoitos'],
+        target: 10 // 10 caixas
+      }
+    },
+     {
+      id: 'prog3',
+      industryId: 'ind3', // LimpMax
+      title: 'Faxina Premiada LimpMax',
+      description: 'Venda o novo Sabão em Pó LimpMax e concorra a prêmios.',
+      rules: 'Venda 50 unidades do Sabão em Pó LimpMax 1kg durante o período da campanha para se qualificar.',
+      reward: 'Um kit exclusivo de produtos LimpMax avaliado em R$ 200,00.',
+      startDate: '2025-10-01T00:00:00.000Z',
+      endDate: '2025-11-30T23:59:59.000Z',
+      metric: {
+        type: 'volume_venda_sku',
+        sku: 'LMP0004', // SKU do Sabão em Pó LimpMax 1kg
+        target: 50 // 50 unidades
+      }
+    }
+  ];
+
+  // --- 9. INSCRIÇÕES NOS PROGRAMAS ---
+  // Estrutura para armazenar qual varejista aderiu a qual programa
+  const programSubscriptions = [
+      // Exemplo: { retailerId: 'ret1', programId: 'prog1', date: '2025-10-02T10:00:00.000Z' }
+  ];
+
+
+  // --- 10. SALVANDO TUDO ---
   setItem('users', users);
   setItem('retailers', retailers);
   setItem('industries', industries);
@@ -379,15 +435,10 @@ export const seedDatabase = () => {
   setItem('clients', clients);
   setItem('inventory', inventory);
   setItem('sales', sales);
-  setItem('settings', {});
+  setItem('programs', programs); // <-- ADICIONADO
+  setItem('programSubscriptions', programSubscriptions); // <-- ADICIONADO
+  setItem('settings', {})
 
-  console.log("🎉 LocalStorage populado com sucesso!");
-  console.log(`📊 RESUMO:`);
-  console.log(`   - ${users.length} usuários`);
-  console.log(`   - ${retailers.length} varejistas`);
-  console.log(`   - ${industries.length} indústrias`);
-  console.log(`   - ${products.length} produtos`);
-  console.log(`   - ${clients.length} clientes`);
-  console.log(`   - ${inventory.length} itens no estoque`);
-  console.log(`   - ${sales.length} vendas`);
+
+    console.log(`✅ ${sales.length} vendas criadas`);
 };

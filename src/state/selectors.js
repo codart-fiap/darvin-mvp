@@ -49,8 +49,6 @@ export const getClientsByRetailer = (retailerId) => {
     return clients.filter(c => c.retailerId === retailerId);
 } 
 
-
-
 // Conversor de texto para carrinho
 export const parseTextToCart = (text, inventory) => {
     const cleanedText = text.toLowerCase().replace(/vendi/g, '').trim();
@@ -89,7 +87,6 @@ export const parseTextToCart = (text, inventory) => {
     });
     return { items: cartItems, notFound: notFound };
 }
-
 
 // --------------------
 // SELECTORS APRIMORADOS
@@ -329,4 +326,63 @@ export const getProductDetails = (retailerId, productId) => {
         averagePrice,
         averageProfit: averageProfit > 0 ? averageProfit : 0,
     };
+}; // <-- CHAVE DE FECHAMENTO QUE FALTAVA
+
+// --- NOVO SELECTOR PARA PROGRAMAS ---
+export const getProgramsForRetailer = (retailerId) => {
+    const programs = getItem('programs') || [];
+    const industries = getItem('industries') || [];
+    const subscriptions = getItem('programSubscriptions') || [];
+    const sales = getSalesByRetailer(retailerId);
+    const products = getItem('products') || [];
+
+    return programs.map(program => {
+        const industry = industries.find(i => i.id === program.industryId);
+        const subscription = subscriptions.find(s => s.retailerId === retailerId && s.programId === program.id);
+
+        let progress = { current: 0, target: 0, percentage: 0 };
+
+        if (subscription) {
+            const programSales = sales.filter(s => {
+                const saleDate = new Date(s.dataISO);
+                return saleDate >= new Date(program.startDate) && saleDate <= new Date(program.endDate);
+            });
+
+            if (program.metric.type === 'volume_venda_sku') {
+                progress.target = program.metric.target;
+                programSales.forEach(sale => {
+                    sale.itens.forEach(item => {
+                        if (item.sku === program.metric.sku) {
+                            progress.current += item.qtde;
+                        }
+                    });
+                });
+            }
+            // OBS: A lógica para 'volume_venda_categoria' com % de aumento é mais complexa
+            // e precisaria de um histórico de vendas anterior.
+            // Por simplicidade, vamos tratar como uma meta de unidades vendidas.
+            else if (program.metric.type === 'volume_venda_categoria') {
+                 progress.target = 200; // Meta de exemplo: Vender 200 unidades
+                 programSales.forEach(sale => {
+                    sale.itens.forEach(item => {
+                        const product = products.find(p => p.id === item.productId);
+                        if (product && program.metric.categories.includes(product.subcategoria)) {
+                             progress.current += item.qtde;
+                        }
+                    });
+                });
+            }
+             if (progress.target > 0) {
+                progress.percentage = Math.min(Math.round((progress.current / progress.target) * 100), 100);
+            }
+        }
+
+        return {
+            ...program,
+            industryName: industry?.nomeFantasia,
+            industryLogo: industry?.logo,
+            isSubscribed: !!subscription,
+            progress: progress
+        };
+    });
 };
