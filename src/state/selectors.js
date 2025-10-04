@@ -1,6 +1,6 @@
 // --- ARQUIVO ATUALIZADO: src/state/selectors.js ---
 import { getItem } from './storage';
-import { differenceInDays } from 'date-fns'; // Importa a função para calcular a diferença em dias
+import { differenceInDays } from 'date-fns';
 
 // Busca todos os atores (varejistas ou indústrias)
 export const getActorsByType = (actorType) => {
@@ -37,6 +37,7 @@ export const getInventoryByRetailer = (retailerId) => {
             ...product,
             ...item,
             marca: industry ? industry.nomeFantasia : 'Marca Desconhecida',
+            logo: industry ? industry.logo : null, // <-- ADICIONADO
             lote: item.lote
         };
     });
@@ -47,6 +48,8 @@ export const getClientsByRetailer = (retailerId) => {
     const clients = getItem('clients') || [];
     return clients.filter(c => c.retailerId === retailerId);
 } 
+
+
 
 // Conversor de texto para carrinho
 export const parseTextToCart = (text, inventory) => {
@@ -92,8 +95,8 @@ export const parseTextToCart = (text, inventory) => {
 // SELECTORS APRIMORADOS
 // --------------------
 
-// Monta os dados de Dashboard do Varejista
-export const getDashboardData = (retailerId, days = 30) => {
+// Monta os dados de Dashboard do Varejista (AGORA COM FILTRO DE DATA E CATEGORIA)
+export const getDashboardData = (retailerId, days = 30, categoryFilter = null, dateFilter = null) => {
     const sales = getSalesByRetailer(retailerId);
     const products = getItem('products') || [];
     const industries = getItem('industries') || [];
@@ -101,24 +104,51 @@ export const getDashboardData = (retailerId, days = 30) => {
     // Filtra por período
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
-    const filteredSales = sales.filter(s => new Date(s.dataISO) >= cutoffDate);
+    let periodSales = sales.filter(s => new Date(s.dataISO) >= cutoffDate);
+    let filteredSales = periodSales;
 
-    // KPIs
+    // >>> NOVO: Aplica o filtro de data se ele existir <<<
+    if (dateFilter) {
+        // Converte a data do filtro (DD/MM) para um formato comparável
+        const [day, month] = dateFilter.split('/');
+        filteredSales = periodSales.filter(sale => {
+            const saleDate = new Date(sale.dataISO);
+            // Compara dia e mês da venda com o filtro
+            return saleDate.getDate() === parseInt(day, 10) && (saleDate.getMonth() + 1) === parseInt(month, 10);
+        });
+    }
+    
+    // Aplica o filtro de categoria se ele existir (pode ser combinado com o de data)
+    if (categoryFilter) {
+        filteredSales = filteredSales.map(sale => {
+            const filteredItems = sale.itens.filter(item => {
+                const product = products.find(p => p.id === item.productId);
+                return product && product.categoria === categoryFilter;
+            });
+
+            if (filteredItems.length === 0) return null;
+
+            const totalLiquido = filteredItems.reduce((sum, i) => sum + (i.qtde * i.precoUnit), 0);
+            return { ...sale, itens: filteredItems, totalLiquido };
+        }).filter(Boolean);
+    }
+
+    // KPIs (calculados sobre as vendas filtradas)
     const numberOfSales = filteredSales.length;
     const totalRevenue = filteredSales.reduce((sum, s) => sum + s.totalLiquido, 0);
     const averageTicket = numberOfSales > 0 ? totalRevenue / numberOfSales : 0;
 
-    // Receita por dia
+    // Receita por dia (gráfico não é afetado pelos filtros para manter o contexto)
     const salesByDayMap = {};
-    filteredSales.forEach(s => {
+    periodSales.forEach(s => {
         const day = new Date(s.dataISO).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' });
         salesByDayMap[day] = (salesByDayMap[day] || 0) + s.totalLiquido;
     });
     const salesByDay = Object.keys(salesByDayMap).map(d => ({ name: d, Receita: salesByDayMap[d] }));
 
-    // Receita por categoria
+    // Receita por categoria (gráfico não é afetado pelos filtros para manter o contexto)
     const revenueByCategoryMap = {};
-    filteredSales.forEach(s => {
+    periodSales.forEach(s => {
         s.itens.forEach(i => {
             const product = products.find(p => p.id === i.productId);
             if (product) {
@@ -129,7 +159,7 @@ export const getDashboardData = (retailerId, days = 30) => {
     });
     const revenueByCategory = Object.keys(revenueByCategoryMap).map(c => ({ name: c, Receita: revenueByCategoryMap[c] }));
 
-    // Top 5 produtos
+    // Top 5 produtos (afetado por ambos os filtros)
     const productSalesMap = {};
     filteredSales.forEach(s => {
         s.itens.forEach(i => {
@@ -150,7 +180,7 @@ export const getDashboardData = (retailerId, days = 30) => {
         kpis: { numberOfSales, totalRevenue, averageTicket },
         charts: { salesByDay, revenueByCategory },
         tables: { top5Products },
-        raw: { sales: filteredSales } // Exporta vendas filtradas para uso em outros seletores
+        raw: { sales: filteredSales }
     };
 };
 

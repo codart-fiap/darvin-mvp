@@ -1,10 +1,8 @@
-// --- ARQUIVO: src/pages/retail/pos/TraditionalPOS.jsx ---
+// --- ARQUIVO ATUALIZADO: src/pages/retail/pos/TraditionalPOS.jsx ---
 // --- TECNOLOGIA: React, JSX, JavaScript, React-Bootstrap ---
 
 // --- 1. IMPORTAÇÕES ---
 import React, { useState, useMemo } from 'react';
-// ✅ CORREÇÃO: Voltando para os caminhos relativos corretos.
-// Para sair de 'src/pages/retail/pos' e chegar em 'src/', precisamos subir três níveis.
 import { useAuth } from '../../../hooks/useAuth';
 import { getInventoryByRetailer, getClientsByRetailer } from '../../../state/selectors';
 import { setItem, getItem } from '../../../state/storage';
@@ -46,7 +44,7 @@ const TraditionalPOS = () => {
         setTimeout(() => setError(''), 3000);
       }
     } else {
-      setCart([...cart, { ...product, qtde: 1, precoUnit: product.precoSugerido }]);
+      setCart([...cart, { ...product, qtde: 1, precoUnit: product.precoVenda }]);
     }
   };
   
@@ -111,7 +109,13 @@ const TraditionalPOS = () => {
                     {searchResults.map(item => (
                         <Col xl={3} lg={4} md={6} key={item.id} className="mb-3">
                             <Card className="product-card h-100" onClick={() => addToCart(item)}>
-                                <Card.Img variant="top" src={`https://via.placeholder.com/200x150/EEEEEE/999999?text=${item.sku}`} className="product-card-img" />
+                                {/* --- ALTERAÇÃO AQUI --- */}
+                                <Card.Img 
+                                    variant="top" 
+                                    src={item.logo || `https://via.placeholder.com/200x150/EEEEEE/999999?text=${item.sku}`} 
+                                    className="product-card-img" 
+                                    style={{ objectFit: 'contain', padding: '1rem' }} 
+                                />
                                 <Card.Body className="d-flex flex-column">
                                     <Card.Text className="text-muted mb-1"><small>{item.marca}</small></Card.Text>
                                     <Card.Title as="h6" className="mb-1" style={{ fontSize: '0.9rem', flexGrow: 1 }}>{item.nome}</Card.Title>
@@ -120,7 +124,7 @@ const TraditionalPOS = () => {
                                     </Card.Text>
                                 </Card.Body>
                                 <Card.Footer>
-                                    <strong>R$ {item.precoSugerido.toFixed(2)}</strong>
+                                    <strong>R$ {item.precoVenda.toFixed(2)}</strong>
                                 </Card.Footer>
                             </Card>
                         </Col>
@@ -130,16 +134,13 @@ const TraditionalPOS = () => {
 
             {/* Coluna da Direita: Carrinho (Comanda) */}
             <Col md={5}>
-                {/* ✅ ALTERAÇÃO: Usando a classe CSS `pos-cart` que definimos */}
                 <Card className="pos-cart">
-                    {/* ✅ ALTERAÇÃO: Removidas as classes de layout daqui, pois agora estão no CSS */}
                     <Card.Body>
                         <Card.Title>Comanda</Card.Title>
 
                         {success && <Alert variant="success">{success}</Alert>}
                         {error && <Alert variant="danger">{error}</Alert>}
                         
-                        {/* ✅ ALTERAÇÃO: Usando a classe `pos-cart-items` para a área de rolagem */}
                         <div className="pos-cart-items">
                             <Table hover>
                                 <thead>
@@ -161,7 +162,6 @@ const TraditionalPOS = () => {
                             </Table>
                         </div>
                         
-                        {/* ✅ ALTERAÇÃO: Usando a classe `pos-cart-footer` para o rodapé */}
                         <div className="pos-cart-footer">
                             <h4 className="text-end">Total: R$ {cartTotal.toFixed(2)}</h4>
                             <hr/>
@@ -192,4 +192,3 @@ const TraditionalPOS = () => {
 };
 
 export default TraditionalPOS;
-

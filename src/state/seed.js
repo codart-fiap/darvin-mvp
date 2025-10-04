@@ -1,7 +1,10 @@
 // --- ARQUIVO: src/state/seed.js - VERSÃO EXPANDIDA ---
 import { setItem } from './storage';
 import { generateId } from '../utils/ids';
-
+import logoBoreal from '../assets/images/logos/logoBoreal.png';
+import logoDoceVida from '../assets/images/logos/logoDoceVida.png';
+import logoLimpMax from '../assets/images/logos/logoLimpMax.png';
+import logoBelezaPura from '../assets/images/logos/logoBelezaPura.png';
 export const seedDatabase = () => {
   console.log("🌱 Populando o localStorage com dados EXPANDIDOS...");
 
@@ -9,21 +12,25 @@ export const seedDatabase = () => {
   const industries = [
     {
       id: 'ind1', nomeFantasia: 'Boreal Bebidas S.A.', razaoSocial: 'Boreal Bebidas S.A.', cnpj: '11.111.111/0001-11',
+      logo: logoBoreal, // <-- VÍRGULA ADICIONADA
       endereco: { logradouro: 'Av. Polar, 100', bairro: 'Centro', cidade: 'Campinas', uf: 'SP', cep: '13010-000' },
       linhaAtuacao: 'Bebidas', contato: { telefone: '19 4002-8922', email: 'bi@borealbebidas.com' }, premium: true
     },
     {
       id: 'ind2', nomeFantasia: 'DoceVida Alimentos', razaoSocial: 'DoceVida Indústria Alimentícia Ltda.', cnpj: '22.222.222/0001-22',
+      logo: logoDoceVida, // <-- VÍRGULA ADICIONADA
       endereco: { logradouro: 'Rua das Glicínias, 250', bairro: 'Jardim Doce', cidade: 'Valinhos', uf: 'SP', cep: '13270-000' },
       linhaAtuacao: 'Alimentos', contato: { telefone: '19 3322-4455', email: 'contato@docevida.com' }, premium: false
     },
     {
       id: 'ind3', nomeFantasia: 'LimpMax Produtos', razaoSocial: 'LimpMax Indústria e Comércio Ltda.', cnpj: '33.444.555/0001-66',
+      logo: logoLimpMax, // <-- VÍRGULA ADICIONADA
       endereco: { logradouro: 'Av. Industrial, 777', bairro: 'Polo Industrial', cidade: 'Jundiaí', uf: 'SP', cep: '13200-000' },
       linhaAtuacao: 'Limpeza', contato: { telefone: '11 3300-5566', email: 'vendas@limpmax.com' }, premium: true
     },
     {
       id: 'ind4', nomeFantasia: 'BelezaPura Cosméticos', razaoSocial: 'BelezaPura Ind. Cosméticos S.A.', cnpj: '44.555.666/0001-77',
+      logo: logoBelezaPura, // <-- VÍRGULA ADICIONADA
       endereco: { logradouro: 'Rua das Flores, 333', bairro: 'Jardim Aroma', cidade: 'São Paulo', uf: 'SP', cep: '04567-000' },
       linhaAtuacao: 'Higiene Pessoal', contato: { telefone: '11 2200-4433', email: 'contato@belezapura.com' }, premium: false
     },

@@ -1,9 +1,9 @@
 // FILE: src/pages/retail/DashboardRetail.jsx
 import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom'; // <-- ADICIONADO: Para o link "Ver mais"
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { getDashboardData, getRetailerInsights } from '../../state/selectors';
-import { Container, Row, Col, Card, ButtonGroup, Button, Table, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Card, ButtonGroup, Button, Table, Alert, Badge } from 'react-bootstrap';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { BoxSeam, ExclamationCircle, GraphUpArrow, GraphDownArrow } from 'react-bootstrap-icons';
 
@@ -13,17 +13,20 @@ const ICONS = { BoxSeam, ExclamationCircle, GraphUpArrow, GraphDownArrow };
 const DashboardRetail = () => {
     const { user } = useAuth();
     const [period, setPeriod] = useState(30);
+    const [categoryFilter, setCategoryFilter] = useState(null);
+    const [dateFilter, setDateFilter] = useState(null); // <-- NOVO ESTADO PARA FILTRO DE DATA
 
     const dashboardData = useMemo(() => {
         if (!user) return null;
-        return getDashboardData(user.actorId, period);
-    }, [user, period]);
+        // Passa ambos os filtros para o seletor
+        return getDashboardData(user.actorId, period, categoryFilter, dateFilter);
+    }, [user, period, categoryFilter, dateFilter]);
 
     // Busca os dados para o Assistente de Performance
     const insights = useMemo(() => {
         if (!user) return [];
         return getRetailerInsights(user.actorId);
-    }, [user, period]);
+    }, [user]);
 
     if (!dashboardData) {
         return <div>Carregando...</div>;
@@ -32,10 +35,38 @@ const DashboardRetail = () => {
     const { kpis, charts, tables } = dashboardData;
     const renderCustomizedLabel = ({ value }) => { return `R$${value.toFixed(2)}`; };
 
+    // Função para lidar com o clique no gráfico de pizza
+    const handlePieClick = (data) => {
+        const category = data.name;
+        setCategoryFilter(prev => prev === category ? null : category);
+    };
+
+    // <-- NOVA FUNÇÃO PARA CLIQUE NO GRÁFICO DE BARRAS -->
+    const handleBarClick = (data) => {
+        if (data && data.activePayload && data.activePayload.length > 0) {
+            const date = data.activePayload[0].payload.name;
+            setDateFilter(prev => prev === date ? null : date);
+        }
+    };
+
     return (
         <Container fluid>
             <div className="d-flex justify-content-between align-items-center mb-4">
-                <h1 className="h3 mb-0">Dashboard</h1>
+                <div>
+                    <h1 className="h3 mb-0 d-inline-block me-3">Dashboard</h1>
+                    {/* Indicador de filtro de categoria */}
+                    {categoryFilter && (
+                        <Badge pill bg="info" as="button" onClick={() => setCategoryFilter(null)} className="border-0 me-2">
+                            Categoria: {categoryFilter} &times;
+                        </Badge>
+                    )}
+                    {/* NOVO: Indicador de filtro de data */}
+                    {dateFilter && (
+                        <Badge pill bg="secondary" as="button" onClick={() => setDateFilter(null)} className="border-0">
+                            Data: {dateFilter} &times;
+                        </Badge>
+                    )}
+                </div>
                 <ButtonGroup>
                     <Button variant={period === 7 ? 'primary' : 'outline-primary'} onClick={() => setPeriod(7)}>7 Dias</Button>
                     <Button variant={period === 30 ? 'primary' : 'outline-primary'} onClick={() => setPeriod(30)}>30 Dias</Button>
@@ -57,7 +88,6 @@ const DashboardRetail = () => {
                             <Card.Title as="h6" className="text-muted mb-3">Assistente de Performance</Card.Title>
                             {insights.length > 0 ? (
                                 <>
-                                    {/* Mostra apenas os 2 insights mais importantes */}
                                     {insights.slice(0, 2).map((insight, index) => {
                                         const IconComponent = ICONS[insight.icon];
                                         return (
@@ -88,7 +118,7 @@ const DashboardRetail = () => {
                         <Card.Body>
                             <Card.Title>Receita por Dia</Card.Title>
                             <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={charts.salesByDay}>
+                                <BarChart data={charts.salesByDay} onClick={handleBarClick} style={{ cursor: 'pointer' }}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="name" />
                                     <YAxis tickFormatter={(value) => `R$${value}`} />
@@ -136,6 +166,8 @@ const DashboardRetail = () => {
                                       outerRadius={80} 
                                       labelLine={false} 
                                       label={renderCustomizedLabel}
+                                      onClick={handlePieClick}
+                                      style={{ cursor: 'pointer' }}
                                     >
                                         {charts.revenueByCategory.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
