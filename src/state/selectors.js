@@ -1,31 +1,27 @@
 // --- ARQUIVO: src/state/selectors.js ---
-// --- TECNOLOGIA: JavaScript ---
-
 import { getItem } from './storage';
 
-// ✅ CORREÇÃO APLICADA AQUI
-// A função agora busca pela chave correta ("retailers" ou "industries").
+// Busca todos os atores (varejistas ou indústrias)
 export const getActorsByType = (actorType) => {
     const key = actorType === 'retail' ? 'retailers' : 'industries';
     const items = getItem(key);
     return items || [];
 }
 
-// Busca os dados de um "ator" (varejista, etc.) específico pelo seu ID.
+// Busca os dados de um ator específico
 export const getActorData = (actorId, actorType) => {
-    const items = getItem(`${actorType}s`);
+    const key = actorType === 'retail' ? 'retailers' : 'industries';
+    const items = getItem(key);
     return items?.find(item => item.id === actorId) || null;
 }
 
-// Busca todas as vendas de um varejista específico.
+// Vendas por varejista
 export const getSalesByRetailer = (retailerId) => {
     const sales = getItem('sales') || [];
     return sales.filter(s => s.retailerId === retailerId);
 }
 
-// --- FUNÇÕES ESPECÍFICAS PARA O VAREJO ---
-
-// Busca o inventário de um varejista e adiciona informações dos produtos e das marcas.
+// Inventário por varejista
 export const getInventoryByRetailer = (retailerId) => {
     const inventory = getItem('inventory') || [];
     const products = getItem('products') || [];
@@ -39,86 +35,19 @@ export const getInventoryByRetailer = (retailerId) => {
         return { 
             ...product,
             ...item,
-            marca: industry ? industry.nomeFantasia : 'Marca Desconhecida'
+            marca: industry ? industry.nomeFantasia : 'Marca Desconhecida',
+            lote: item.lote
         };
     });
 }
 
-// Busca todos os clientes de um varejista.
+// Clientes por varejista
 export const getClientsByRetailer = (retailerId) => {
     const clients = getItem('clients') || [];
     return clients.filter(c => c.retailerId === retailerId);
 } 
 
-// Função complexa que calcula todos os dados para o Dashboard.
-export const getDashboardData = (retailerId, periodInDays) => {
-    const allSales = getItem('sales') || [];
-    const products = getItem('products') || [];
-    const industries = getItem('industries') || [];
-
-    const periodEndDate = new Date();
-    const periodStartDate = new Date();
-    periodStartDate.setDate(periodStartDate.getDate() - periodInDays);
-
-    const filteredSales = allSales.filter(sale => {
-        const saleDate = new Date(sale.dataISO);
-        return sale.retailerId === retailerId && saleDate >= periodStartDate && saleDate <= periodEndDate;
-    });
-
-    const totalRevenue = filteredSales.reduce((acc, sale) => acc + sale.totalLiquido, 0);
-    const numberOfSales = filteredSales.length;
-    const averageTicket = numberOfSales > 0 ? totalRevenue / numberOfSales : 0;
-
-    const salesByDay = filteredSales.reduce((acc, sale) => {
-        const day = new Date(sale.dataISO).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-        if (!acc[day]) acc[day] = 0;
-        acc[day] += sale.totalLiquido;
-        return acc;
-    }, {});
-    const salesByDayChartData = Object.keys(salesByDay).map(day => ({ name: day, Receita: salesByDay[day] })).sort((a, b) => a.name.localeCompare(b.name));
-
-    const revenueByCategory = filteredSales.reduce((acc, sale) => {
-        sale.itens.forEach(item => {
-            const product = products.find(p => p.id === item.productId);
-            if (product) {
-                if (!acc[product.categoria]) acc[product.categoria] = 0;
-                acc[product.categoria] += (item.qtde * item.precoUnit);
-            }
-        });
-        return acc;
-    }, {});
-
-    const revenueByCategoryChartData = Object.keys(revenueByCategory).map(cat => ({ 
-        name: cat, 
-        Receita: parseFloat(revenueByCategory[cat].toFixed(2)) 
-    }));
-    
-    const productSales = filteredSales.reduce((acc, sale) => {
-        sale.itens.forEach(item => {
-            if (!acc[item.productId]) {
-                const product = products.find(p => p.id === item.productId);
-                const industry = industries.find(ind => ind.id === product?.industryId);
-                acc[item.productId] = { 
-                    name: product?.nome || 'Desconhecido', 
-                    marca: industry?.nomeFantasia || 'N/A',
-                    qtde: 0 
-                };
-            }
-            acc[item.productId].qtde += item.qtde;
-        });
-        return acc;
-    }, {});
-    
-    const top5Products = Object.values(productSales).sort((a, b) => b.qtde - a.qtde).slice(0, 5);
-
-    return {
-        kpis: { totalRevenue, numberOfSales, averageTicket },
-        charts: { salesByDay: salesByDayChartData, revenueByCategory: revenueByCategoryChartData },
-        tables: { top5Products }
-    };
-}
-    
-// Converte um texto de linguagem natural em itens de carrinho.
+// Conversor de texto para carrinho
 export const parseTextToCart = (text, inventory) => {
     const cleanedText = text.toLowerCase().replace(/vendi/g, '').trim();
     const parts = cleanedText.split(/ e |,| e,|, e/);
@@ -144,7 +73,11 @@ export const parseTextToCart = (text, inventory) => {
             if (existingItem) {
                 existingItem.qtde += finalQty;
             } else {
-                cartItems.push({ ...foundProduct, qtde: finalQty, precoUnit: foundProduct.precoSugerido });
+                cartItems.push({ 
+                    ...foundProduct, 
+                    qtde: finalQty, 
+                    precoUnit: foundProduct.precoVenda
+                });
             }
         } else {
             notFound.push(trimmedPart);
@@ -153,85 +86,125 @@ export const parseTextToCart = (text, inventory) => {
     return { items: cartItems, notFound: notFound };
 }
 
-// Gera insights e recomendações para o Assistente de Performance.
-export const getRetailerInsights = (retailerId) => {
-    const insights = [];
-    const allSales = getItem('sales') || [];
-    const inventory = getInventoryByRetailer(retailerId);
-    const retailers = getItem('retailers') || [];
 
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentSales = allSales.filter(s => s.retailerId === retailerId && new Date(s.dataISO) >= thirtyDaysAgo);
-    
-    inventory.forEach(item => {
-        const salesOfItem = recentSales.flatMap(s => s.itens).filter(i => i.productId === item.productId);
-        const totalSold = salesOfItem.reduce((sum, i) => sum + i.qtde, 0);
-        const avgDailySale = totalSold / 30;
-        const daysOfStock = avgDailySale > 0 ? item.estoque / avgDailySale : Infinity;
+// --------------------
+// NOVOS SELECTORS
+// --------------------
 
-        if (daysOfStock < 7) {
-            insights.push({
-                id: `insight-stock-${item.id}`,
-                type: 'warning', icon: 'BoxSeam',
-                title: 'Estoque Baixo',
-                description: `O estoque de "${item.nome}" está acabando!`,
-                metric: `Restam ${item.estoque} unidades. Duração estimada: ${Math.floor(daysOfStock)} dia(s).`,
-                action: { text: 'Verificar Estoque', link: `/retail/inventory` }
-            });
-        }
+// Monta os dados de Dashboard do Varejista
+export const getDashboardData = (retailerId, days = 30) => {
+    const sales = getSalesByRetailer(retailerId);
+    const products = getItem('products') || [];
+    const industries = getItem('industries') || [];
+
+    // Filtra por período
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    const filteredSales = sales.filter(s => new Date(s.dataISO) >= cutoffDate);
+
+    // KPIs
+    const numberOfSales = filteredSales.length;
+    const totalRevenue = filteredSales.reduce((sum, s) => sum + s.totalLiquido, 0);
+    const averageTicket = numberOfSales > 0 ? totalRevenue / numberOfSales : 0;
+
+    // Receita por dia
+    const salesByDayMap = {};
+    filteredSales.forEach(s => {
+        const day = new Date(s.dataISO).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' });
+        salesByDayMap[day] = (salesByDayMap[day] || 0) + s.totalLiquido;
     });
+    const salesByDay = Object.keys(salesByDayMap).map(d => ({ name: d, Receita: salesByDayMap[d] }));
 
-    const productsWithSales = new Set(recentSales.flatMap(s => s.itens).map(i => i.productId));
-    const slowMover = inventory.find(item => !productsWithSales.has(item.productId) && item.estoque > 0);
-    
-    if (slowMover) {
-        insights.push({
-            id: `insight-slow-${slowMover.id}`,
-            type: 'info', icon: 'ExclamationCircle',
-            title: 'Oportunidade de Venda',
-            description: `O produto "${slowMover.nome}" não é vendido há mais de 30 dias.`,
-            metric: `Estoque atual: ${slowMover.estoque} unidades.`,
-            action: { text: 'Criar Promoção', link: '#' }
-        });
-    }
-    
-    if (retailers.length > 1) {
-        const retailerData = getDashboardData(retailerId, 30);
-        const retailerTicket = retailerData.kpis.averageTicket;
-        
-        let totalRevenueAll = 0;
-        let totalSalesCountAll = 0;
-        retailers.forEach(r => {
-            if (r.id !== retailerId) {
-                const data = getDashboardData(r.id, 30);
-                totalRevenueAll += data.kpis.totalRevenue;
-                totalSalesCountAll += data.kpis.numberOfSales;
+    // Receita por categoria
+    const revenueByCategoryMap = {};
+    filteredSales.forEach(s => {
+        s.itens.forEach(i => {
+            const product = products.find(p => p.id === i.productId);
+            if (product) {
+                revenueByCategoryMap[product.categoria] = 
+                    (revenueByCategoryMap[product.categoria] || 0) + (i.qtde * i.precoUnit);
             }
         });
-        const averageTicketOthers = totalSalesCountAll > 0 ? totalRevenueAll / totalSalesCountAll : 0;
+    });
+    const revenueByCategory = Object.keys(revenueByCategoryMap).map(c => ({ name: c, Receita: revenueByCategoryMap[c] }));
 
-        if (retailerTicket > averageTicketOthers * 1.1) {
-            insights.push({
-                id: 'insight-benchmark-good',
-                type: 'success', icon: 'GraphUpArrow',
-                title: 'Ótima Performance!',
-                description: `Seu ticket médio está acima da média de outros varejistas.`,
-                metric: `Seu: R$ ${retailerTicket.toFixed(2)} | Média: R$ ${averageTicketOthers.toFixed(2)}`,
-                action: { text: 'Ver Produtos de Maior Margem', link: '/retail/inventory' }
-            });
-        } else if (retailerTicket < averageTicketOthers * 0.9 && averageTicketOthers > 0) {
-             insights.push({
-                id: 'insight-benchmark-bad',
-                type: 'warning',
-                icon: 'GraphDownArrow',
-                title: 'Oportunidade de Melhoria',
-                description: `Seu ticket médio está abaixo da média de outros varejistas.`,
-                metric: `Seu: R$ ${retailerTicket.toFixed(2)} | Média: R$ ${averageTicketOthers.toFixed(2)}`,
-                action: { text: 'Ver Produtos Mais Vendidos', link: '/retail/dashboard' }
-            });
-        }
+    // Top 5 produtos
+    const productSalesMap = {};
+    filteredSales.forEach(s => {
+        s.itens.forEach(i => {
+            const product = products.find(p => p.id === i.productId);
+            const industry = industries.find(ind => ind.id === product?.industryId);
+            if (product) {
+                const key = product.id;
+                if (!productSalesMap[key]) {
+                    productSalesMap[key] = { name: product.nome, marca: industry?.nomeFantasia || "Desconhecida", qtde: 0 };
+                }
+                productSalesMap[key].qtde += i.qtde;
+            }
+        });
+    });
+    const top5Products = Object.values(productSalesMap).sort((a, b) => b.qtde - a.qtde).slice(0, 5);
+
+    return {
+        kpis: { numberOfSales, totalRevenue, averageTicket },
+        charts: { salesByDay, revenueByCategory },
+        tables: { top5Products }
+    };
+};
+
+
+// Insights básicos do Assistente de Performance
+export const getRetailerInsights = (retailerId) => {
+    const data = getDashboardData(retailerId, 30);
+    const insights = [];
+
+    if (data.kpis.averageTicket < 20) {
+        insights.push({ 
+            id: "insight-avg-ticket",
+            type: "warning", 
+            icon: "GraphDownArrow", 
+            title: "Ticket médio baixo",
+            description: "O ticket médio está abaixo de R$20. Considere oferecer promoções de venda casada ou kits de produtos.",
+            metric: `R$ ${data.kpis.averageTicket.toFixed(2)}`,
+            action: { text: "Ver vendas", link: "/retailer/sales" }
+        });
     }
 
-    return insights.slice(0, 4);
-}
+    if (data.kpis.totalRevenue > 1000) {
+        insights.push({ 
+            id: "insight-revenue",
+            type: "success", 
+            icon: "GraphUpArrow", 
+            title: "Boa receita no período",
+            description: "Sua receita nos últimos 30 dias já ultrapassou R$ 1.000, continue assim!",
+            metric: `R$ ${data.kpis.totalRevenue.toFixed(2)}`,
+            action: { text: "Ver relatório", link: "/retailer/dashboard" }
+        });
+    }
+
+    if (data.tables.top5Products.length > 0 && data.tables.top5Products[0].qtde > 50) {
+        insights.push({ 
+            id: "insight-top-product",
+            type: "info", 
+            icon: "BoxSeam", 
+            title: "Produto campeão de vendas",
+            description: `O produto mais vendido (${data.tables.top5Products[0].name}) já saiu mais de ${data.tables.top5Products[0].qtde} vezes.`,
+            metric: `${data.tables.top5Products[0].qtde} un.`,
+            action: { text: "Ver estoque", link: "/retailer/stock" }
+        });
+    }
+
+    if (insights.length === 0) {
+        insights.push({
+            id: "insight-none",
+            type: "neutral",
+            icon: "ExclamationCircle",
+            title: "Nenhum insight relevante",
+            description: "Não encontramos insights significativos no período. Continue registrando suas vendas e movimentações.",
+            metric: "-",
+            action: { text: "Atualizar dados", link: "/retailer/dashboard" }
+        });
+    }
+
+    return insights;
+};

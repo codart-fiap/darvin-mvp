@@ -35,6 +35,7 @@ export const seedDatabase = () => {
     { id: generateId(), email: 'ana@mercearia.com', password: '123', role: 'retail', actorId: 'ret1', displayName: 'Ana (Bom Preço)' },
     { id: generateId(), email: 'bruno@mercadocentral.com', password: '123', role: 'retail', actorId: 'ret2', displayName: 'Bruno (Central)' },
     { id: generateId(), email: 'bi@borealbebidas.com', password: '123', role: 'industry', actorId: 'ind1', displayName: 'BI (Boreal)' },
+    { id: generateId(), email: 'admin@darvin.com', password: 'admin', role: 'admin', displayName: 'Administrador' }
   ];
 
   const products = [];
@@ -44,7 +45,7 @@ export const seedDatabase = () => {
     ["Água Mineral Boreal com Gás 500ml", "Águas", 2.50], ["Água Mineral Boreal sem Gás 500ml", "Águas", 2.00],
   ];
   bebidas.forEach((p, i) => products.push({
-    id: generateId(), sku: `BEV-${i+1}`.padStart(7,"0"), nome: p[0], categoria: "Bebidas", subcategoria: p[1], industryId: "ind1", precoSugerido: p[2]
+    id: generateId(), sku: `BEV-${(i+1).toString().padStart(4,"0")}`, nome: p[0], categoria: "Bebidas", subcategoria: p[1], industryId: "ind1", precoSugerido: p[2]
   }));
 
   const alimentos = [
@@ -52,39 +53,68 @@ export const seedDatabase = () => {
     ["Macarrão DoceVida Espaguete 500g", "Massas", 5.10], ["Molho de Tomate DoceVida Tradicional 340g", "Molhos", 3.20],
   ];
   alimentos.forEach((p, i) => products.push({
-    id: generateId(), sku: `ALI-${i+1}`.padStart(7,"0"), nome: p[0], categoria: "Alimentos", subcategoria: p[1], industryId: "ind2", precoSugerido: p[2]
+    id: generateId(), sku: `ALI-${(i+1).toString().padStart(4,"0")}`, nome: p[0], categoria: "Alimentos", subcategoria: p[1], industryId: "ind2", precoSugerido: p[2]
   }));
+
+  // Nomes fictícios para clientes
+  const nomesClientes = ["João", "Maria", "Pedro", "Ana", "Carlos", "Fernanda", "Lucas", "Mariana", "José", "Patrícia", "Rafael", "Beatriz", "Paulo", "Carla", "André", "Roberta", "Gustavo", "Larissa", "Fábio", "Juliana"];
 
   let clients = [];
   retailers.forEach(r => {
-    for (let i = 1; i <= 15; i++) {
-      clients.push({ id: generateId(), retailerId: r.id, nome: `Cliente ${i} (${r.nomeFantasia})` });
+    for (let i = 0; i < 15; i++) {
+      const nome = nomesClientes[Math.floor(Math.random() * nomesClientes.length)];
+      clients.push({ id: generateId(), retailerId: r.id, nome: `${nome} (${r.nomeFantasia})` });
     }
   });
 
   let inventory = [];
   retailers.forEach(r => {
     const sample = products.sort(() => 0.5 - Math.random()).slice(0, 8);
-    sample.forEach(p => {
+    sample.forEach((p, idx) => {
       const validade = new Date();
       validade.setDate(validade.getDate() + Math.floor(Math.random() * 180));
       inventory.push({
-        id: generateId(), retailerId: r.id, productId: p.id, estoque: Math.floor(Math.random() * 100) + 20,
-        custoMedio: +(p.precoSugerido * 0.7).toFixed(2), precoVenda: +(p.precoSugerido * 1.25).toFixed(2),
-        dataValidade: validade.toISOString()
+        id: generateId(),
+        retailerId: r.id,
+        productId: p.id,
+        estoque: Math.floor(Math.random() * 100) + 20,
+        custoMedio: +(p.precoSugerido * 0.7).toFixed(2),
+        precoVenda: +(p.precoSugerido * 1.25).toFixed(2),
+        dataValidade: validade.toISOString(),
+        lote: `${r.id.toUpperCase()}-L${idx+1}-${new Date().getFullYear()}`
       });
     });
   });
 
   let sales = [];
+  const formasPagamento = ["Dinheiro", "Cartão Débito", "Cartão Crédito", "Pix", "Vale Alimentação"];
+
   for (let i = 0; i < 400; i++) {
     const retailer = retailers[Math.floor(Math.random() * retailers.length)];
     const retailerInventory = inventory.filter(inv => inv.retailerId === retailer.id && inv.estoque > 0);
     if(retailerInventory.length === 0) continue;
 
-    const itemToSell = retailerInventory[Math.floor(Math.random() * retailerInventory.length)];
-    const productInfo = products.find(p => p.id === itemToSell.productId);
-    const qtde = Math.floor(Math.random() * 5) + 1;
+    const qtdeItens = Math.floor(Math.random() * 4) + 1; // até 5 itens
+    let itensVenda = [];
+    let totalBruto = 0;
+
+    for (let j = 0; j < qtdeItens; j++) {
+      const itemToSell = retailerInventory[Math.floor(Math.random() * retailerInventory.length)];
+      const productInfo = products.find(p => p.id === itemToSell.productId);
+      const qtde = Math.floor(Math.random() * 5) + 1;
+
+      itensVenda.push({ 
+        productId: itemToSell.productId, 
+        sku: productInfo.sku, 
+        qtde, 
+        precoUnit: itemToSell.precoVenda 
+      });
+
+      totalBruto += itemToSell.precoVenda * qtde;
+    }
+
+    const desconto = +(totalBruto * (Math.random() * 0.1)).toFixed(2);
+    const formaPagamento = formasPagamento[Math.floor(Math.random() * formasPagamento.length)];
     const saleDate = new Date();
     saleDate.setDate(saleDate.getDate() - Math.floor(Math.random() * 90));
 
@@ -93,11 +123,11 @@ export const seedDatabase = () => {
         retailerId: retailer.id,
         dataISO: saleDate.toISOString(),
         clienteId: 'consumidor_final',
-        itens: [{ productId: itemToSell.productId, sku: productInfo.sku, qtde, precoUnit: itemToSell.precoVenda }],
-        totalBruto: itemToSell.precoVenda * qtde,
-        desconto: 0,
-        totalLiquido: itemToSell.precoVenda * qtde,
-        formaPagamento: "Dinheiro"
+        itens: itensVenda,
+        totalBruto,
+        desconto,
+        totalLiquido: +(totalBruto - desconto).toFixed(2),
+        formaPagamento
     };
     sales.push(sale);
   }
