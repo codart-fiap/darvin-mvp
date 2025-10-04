@@ -1,10 +1,11 @@
-// --- ARQUIVO: src/state/seed.js ---
+// --- ARQUIVO: src/state/seed.js - VERSÃO EXPANDIDA ---
 import { setItem } from './storage';
 import { generateId } from '../utils/ids';
 
 export const seedDatabase = () => {
-  console.log("Populando o localStorage com dados iniciais...");
+  console.log("🌱 Populando o localStorage com dados EXPANDIDOS...");
 
+  // --- 1. INDÚSTRIAS ---
   const industries = [
     {
       id: 'ind1', nomeFantasia: 'Boreal Bebidas S.A.', razaoSocial: 'Boreal Bebidas S.A.', cnpj: '11.111.111/0001-11',
@@ -16,8 +17,19 @@ export const seedDatabase = () => {
       endereco: { logradouro: 'Rua das Glicínias, 250', bairro: 'Jardim Doce', cidade: 'Valinhos', uf: 'SP', cep: '13270-000' },
       linhaAtuacao: 'Alimentos', contato: { telefone: '19 3322-4455', email: 'contato@docevida.com' }, premium: false
     },
+    {
+      id: 'ind3', nomeFantasia: 'LimpMax Produtos', razaoSocial: 'LimpMax Indústria e Comércio Ltda.', cnpj: '33.444.555/0001-66',
+      endereco: { logradouro: 'Av. Industrial, 777', bairro: 'Polo Industrial', cidade: 'Jundiaí', uf: 'SP', cep: '13200-000' },
+      linhaAtuacao: 'Limpeza', contato: { telefone: '11 3300-5566', email: 'vendas@limpmax.com' }, premium: true
+    },
+    {
+      id: 'ind4', nomeFantasia: 'BelezaPura Cosméticos', razaoSocial: 'BelezaPura Ind. Cosméticos S.A.', cnpj: '44.555.666/0001-77',
+      endereco: { logradouro: 'Rua das Flores, 333', bairro: 'Jardim Aroma', cidade: 'São Paulo', uf: 'SP', cep: '04567-000' },
+      linhaAtuacao: 'Higiene Pessoal', contato: { telefone: '11 2200-4433', email: 'contato@belezapura.com' }, premium: false
+    },
   ];
 
+  // --- 2. VAREJOS ---
   const retailers = [
     { 
       id: 'ret1', nomeFantasia: 'Mercearia Bom Preço', razaoSocial: 'Mercearia Bom Preço Ltda ME', cnpj: '33.333.333/0001-33',
@@ -31,81 +43,279 @@ export const seedDatabase = () => {
     },
   ];
 
+  // --- 3. USUÁRIOS ---
   const users = [
     { id: generateId(), email: 'ana@mercearia.com', password: '123', role: 'retail', actorId: 'ret1', displayName: 'Ana (Bom Preço)' },
     { id: generateId(), email: 'bruno@mercadocentral.com', password: '123', role: 'retail', actorId: 'ret2', displayName: 'Bruno (Central)' },
     { id: generateId(), email: 'bi@borealbebidas.com', password: '123', role: 'industry', actorId: 'ind1', displayName: 'BI (Boreal)' },
-    { id: generateId(), email: 'admin@darvin.com', password: 'admin', role: 'admin', displayName: 'Administrador' }
   ];
 
+  // --- 4. PRODUTOS (EXPANDIDO PARA ~80 PRODUTOS) ---
   const products = [];
-  const bebidas = [
-    ["Refrigerante Boreal Cola 2L", "Refrigerantes", 8.50], ["Refrigerante Boreal Guaraná 2L", "Refrigerantes", 8.50],
-    ["Suco Boreal Laranja 1L", "Sucos", 6.20], ["Suco Boreal Uva 1L", "Sucos", 6.20],
-    ["Água Mineral Boreal com Gás 500ml", "Águas", 2.50], ["Água Mineral Boreal sem Gás 500ml", "Águas", 2.00],
+  
+  // BEBIDAS - Boreal (25 produtos)
+  const bebidasBoreal = [
+    ["Refrigerante Boreal Cola 2L", "Refrigerantes", "Boreal", 8.50, true],
+    ["Refrigerante Boreal Cola Zero 2L", "Refrigerantes", "Boreal", 9.00, true],
+    ["Refrigerante Boreal Guaraná 2L", "Refrigerantes", "Boreal", 8.50, true],
+    ["Refrigerante Boreal Guaraná Zero 2L", "Refrigerantes", "Boreal", 9.00, false],
+    ["Refrigerante Boreal Limão 2L", "Refrigerantes", "Boreal", 8.50, false],
+    ["Refrigerante Boreal Laranja 2L", "Refrigerantes", "Boreal", 8.50, true],
+    ["Refrigerante Boreal Uva 2L", "Refrigerantes", "Boreal", 8.50, false],
+    ["Refrigerante Boreal Cola Lata 350ml", "Refrigerantes", "Boreal", 3.50, true],
+    ["Refrigerante Boreal Guaraná Lata 350ml", "Refrigerantes", "Boreal", 3.50, true],
+    ["Suco Boreal Laranja 1L", "Sucos", "Boreal", 6.20, true],
+    ["Suco Boreal Uva 1L", "Sucos", "Boreal", 6.20, true],
+    ["Suco Boreal Manga 1L", "Sucos", "Boreal", 6.20, false],
+    ["Suco Boreal Maracujá 1L", "Sucos", "Boreal", 6.20, false],
+    ["Suco Boreal Pêssego 1L", "Sucos", "Boreal", 6.20, false],
+    ["Suco Boreal Mix Tropical 1L", "Sucos", "Boreal", 6.80, true],
+    ["Água Mineral Boreal sem Gás 500ml", "Águas", "Boreal", 2.00, true],
+    ["Água Mineral Boreal com Gás 500ml", "Águas", "Boreal", 2.50, true],
+    ["Água Mineral Boreal sem Gás 1,5L", "Águas", "Boreal", 3.50, true],
+    ["Água Mineral Boreal com Gás 1,5L", "Águas", "Boreal", 4.00, false],
+    ["Água Saborizada Boreal Limão 500ml", "Águas", "Boreal", 3.20, false],
+    ["Chá Gelado Boreal Limão 1L", "Chás", "Boreal", 5.50, true],
+    ["Chá Gelado Boreal Pêssego 1L", "Chás", "Boreal", 5.50, true],
+    ["Energético Boreal Energy 250ml", "Energéticos", "Boreal", 6.90, false],
+    ["Isotônico Boreal Sport Laranja 500ml", "Isotônicos", "Boreal", 4.50, false],
+    ["Isotônico Boreal Sport Limão 500ml", "Isotônicos", "Boreal", 4.50, false],
   ];
-  bebidas.forEach((p, i) => products.push({
-    id: generateId(), sku: `BEV-${(i+1).toString().padStart(4,"0")}`, nome: p[0], categoria: "Bebidas", subcategoria: p[1], industryId: "ind1", precoSugerido: p[2]
-  }));
 
-  const alimentos = [
-    ["Biscoito DoceVida Recheado Chocolate 100g", "Biscoitos", 4.50], ["Biscoito DoceVida Água e Sal 200g", "Biscoitos", 3.80],
-    ["Macarrão DoceVida Espaguete 500g", "Massas", 5.10], ["Molho de Tomate DoceVida Tradicional 340g", "Molhos", 3.20],
+  bebidasBoreal.forEach((p, i) => {
+    products.push({
+      id: generateId(),
+      sku: `BEB${String(i + 1).padStart(4, '0')}`,
+      nome: p[0],
+      categoria: "Bebidas",
+      subcategoria: p[1],
+      marca: p[2],
+      industryId: "ind1",
+      precoSugerido: p[3],
+      popular: p[4]
+    });
+  });
+
+  // ALIMENTOS - DoceVida (30 produtos)
+  const alimentosDoceVida = [
+    ["Biscoito DoceVida Recheado Chocolate 100g", "Biscoitos", "DoceVida", 4.50, true],
+    ["Biscoito DoceVida Recheado Morango 100g", "Biscoitos", "DoceVida", 4.50, true],
+    ["Biscoito DoceVida Recheado Baunilha 100g", "Biscoitos", "DoceVida", 4.50, false],
+    ["Biscoito DoceVida Água e Sal 200g", "Biscoitos", "DoceVida", 3.80, true],
+    ["Biscoito DoceVida Cream Cracker 200g", "Biscoitos", "DoceVida", 3.80, true],
+    ["Biscoito DoceVida Maria 200g", "Biscoitos", "DoceVida", 3.50, true],
+    ["Biscoito DoceVida Maisena 200g", "Biscoitos", "DoceVida", 3.50, false],
+    ["Biscoito DoceVida Integral 200g", "Biscoitos", "DoceVida", 5.20, false],
+    ["Macarrão DoceVida Espaguete 500g", "Massas", "DoceVida", 5.10, true],
+    ["Macarrão DoceVida Parafuso 500g", "Massas", "DoceVida", 5.10, true],
+    ["Macarrão DoceVida Penne 500g", "Massas", "DoceVida", 5.10, true],
+    ["Macarrão DoceVida Talharim 500g", "Massas", "DoceVida", 5.30, false],
+    ["Macarrão DoceVida Integral 500g", "Massas", "DoceVida", 6.80, false],
+    ["Molho de Tomate DoceVida Tradicional 340g", "Molhos", "DoceVida", 3.20, true],
+    ["Molho de Tomate DoceVida Picante 340g", "Molhos", "DoceVida", 3.50, false],
+    ["Molho de Tomate DoceVida c/ Manjericão 340g", "Molhos", "DoceVida", 3.80, false],
+    ["Extrato de Tomate DoceVida 140g", "Molhos", "DoceVida", 2.50, true],
+    ["Café DoceVida Torrado e Moído 250g", "Café", "DoceVida", 12.90, true],
+    ["Café DoceVida Torrado e Moído 500g", "Café", "DoceVida", 22.90, true],
+    ["Café DoceVida Expresso 250g", "Café", "DoceVida", 15.90, false],
+    ["Açúcar DoceVida Cristal 1kg", "Açúcar", "DoceVida", 4.50, true],
+    ["Açúcar DoceVida Refinado 1kg", "Açúcar", "DoceVida", 5.20, true],
+    ["Sal DoceVida Refinado 1kg", "Sal", "DoceVida", 2.80, true],
+    ["Farinha de Trigo DoceVida 1kg", "Farinhas", "DoceVida", 5.90, true],
+    ["Fubá DoceVida 500g", "Farinhas", "DoceVida", 3.50, false],
+    ["Arroz DoceVida Tipo 1 - 1kg", "Arroz", "DoceVida", 6.80, true],
+    ["Arroz DoceVida Tipo 1 - 5kg", "Arroz", "DoceVida", 32.90, true],
+    ["Feijão DoceVida Carioca 1kg", "Feijão", "DoceVida", 8.90, true],
+    ["Feijão DoceVida Preto 1kg", "Feijão", "DoceVida", 8.90, true],
+    ["Óleo de Soja DoceVida 900ml", "Óleos", "DoceVida", 7.50, true],
   ];
-  alimentos.forEach((p, i) => products.push({
-    id: generateId(), sku: `ALI-${(i+1).toString().padStart(4,"0")}`, nome: p[0], categoria: "Alimentos", subcategoria: p[1], industryId: "ind2", precoSugerido: p[2]
-  }));
 
-  // Nomes fictícios para clientes
-  const nomesClientes = ["João", "Maria", "Pedro", "Ana", "Carlos", "Fernanda", "Lucas", "Mariana", "José", "Patrícia", "Rafael", "Beatriz", "Paulo", "Carla", "André", "Roberta", "Gustavo", "Larissa", "Fábio", "Juliana"];
+  alimentosDoceVida.forEach((p, i) => {
+    products.push({
+      id: generateId(),
+      sku: `ALI${String(i + 1).padStart(4, '0')}`,
+      nome: p[0],
+      categoria: "Alimentos",
+      subcategoria: p[1],
+      marca: p[2],
+      industryId: "ind2",
+      precoSugerido: p[3],
+      popular: p[4]
+    });
+  });
 
-  let clients = [];
+  // LIMPEZA - LimpMax (15 produtos)
+  const limpezaLimpMax = [
+    ["Detergente LimpMax Limão 500ml", "Detergentes", "LimpMax", 2.50, true],
+    ["Detergente LimpMax Coco 500ml", "Detergentes", "LimpMax", 2.50, true],
+    ["Detergente LimpMax Neutro 500ml", "Detergentes", "LimpMax", 2.50, false],
+    ["Sabão em Pó LimpMax 1kg", "Sabão em Pó", "LimpMax", 12.90, true],
+    ["Sabão em Pó LimpMax 2kg", "Sabão em Pó", "LimpMax", 24.90, true],
+    ["Amaciante LimpMax Lavanda 2L", "Amaciantes", "LimpMax", 8.90, true],
+    ["Amaciante LimpMax Baby 2L", "Amaciantes", "LimpMax", 9.90, false],
+    ["Água Sanitária LimpMax 1L", "Água Sanitária", "LimpMax", 3.50, true],
+    ["Desinfetante LimpMax Lavanda 500ml", "Desinfetantes", "LimpMax", 4.50, true],
+    ["Desinfetante LimpMax Pinho 500ml", "Desinfetantes", "LimpMax", 4.50, true],
+    ["Limpador Multiuso LimpMax 500ml", "Limpadores", "LimpMax", 5.90, true],
+    ["Limpa Vidros LimpMax 500ml", "Limpadores", "LimpMax", 6.50, false],
+    ["Esponja LimpMax Dupla Face c/ 3un", "Esponjas", "LimpMax", 3.90, true],
+    ["Pano de Limpeza LimpMax c/ 3un", "Panos", "LimpMax", 5.50, false],
+    ["Luva de Látex LimpMax M", "Luvas", "LimpMax", 7.90, false],
+  ];
+
+  limpezaLimpMax.forEach((p, i) => {
+    products.push({
+      id: generateId(),
+      sku: `LMP${String(i + 1).padStart(4, '0')}`,
+      nome: p[0],
+      categoria: "Limpeza",
+      subcategoria: p[1],
+      marca: p[2],
+      industryId: "ind3",
+      precoSugerido: p[3],
+      popular: p[4]
+    });
+  });
+
+  // HIGIENE PESSOAL - BelezaPura (15 produtos)
+  const higieneBelezaPura = [
+    ["Sabonete BelezaPura Suave 90g", "Sabonetes", "BelezaPura", 2.50, true],
+    ["Sabonete BelezaPura Hidratante 90g", "Sabonetes", "BelezaPura", 2.80, true],
+    ["Sabonete BelezaPura Ervas 90g", "Sabonetes", "BelezaPura", 2.50, false],
+    ["Shampoo BelezaPura Anticaspa 350ml", "Shampoos", "BelezaPura", 12.90, true],
+    ["Shampoo BelezaPura Hidratação 350ml", "Shampoos", "BelezaPura", 12.90, true],
+    ["Condicionador BelezaPura Hidratação 350ml", "Condicionadores", "BelezaPura", 12.90, true],
+    ["Creme Dental BelezaPura Branqueador 90g", "Creme Dental", "BelezaPura", 4.50, true],
+    ["Creme Dental BelezaPura Tripla Ação 90g", "Creme Dental", "BelezaPura", 4.50, true],
+    ["Desodorante BelezaPura Aerosol 150ml", "Desodorantes", "BelezaPura", 8.90, true],
+    ["Desodorante BelezaPura Roll-on 50ml", "Desodorantes", "BelezaPura", 7.50, false],
+    ["Papel Higiênico BelezaPura 12 rolos", "Papel Higiênico", "BelezaPura", 14.90, true],
+    ["Papel Toalha BelezaPura 2 rolos", "Papel Toalha", "BelezaPura", 6.50, true],
+    ["Lenço Umedecido BelezaPura 48un", "Lenços", "BelezaPura", 5.90, false],
+    ["Cotonete BelezaPura 75un", "Cotonetes", "BelezaPura", 3.50, false],
+    ["Algodão BelezaPura 50g", "Algodão", "BelezaPura", 4.20, false],
+  ];
+
+  higieneBelezaPura.forEach((p, i) => {
+    products.push({
+      id: generateId(),
+      sku: `HIG${String(i + 1).padStart(4, '0')}`,
+      nome: p[0],
+      categoria: "Higiene Pessoal",
+      subcategoria: p[1],
+      marca: p[2],
+      industryId: "ind4",
+      precoSugerido: p[3],
+      popular: p[4]
+    });
+  });
+
+  console.log(`✅ ${products.length} produtos criados`);
+
+  // --- 5. CLIENTES ---
+  const nomesClientes = [
+    "João Silva", "Maria Santos", "Pedro Oliveira", "Ana Costa", "Carlos Souza",
+    "Fernanda Lima", "Lucas Alves", "Mariana Rocha", "José Pereira", "Patrícia Mendes",
+    "Rafael Cardoso", "Beatriz Martins", "Paulo Ribeiro", "Carla Ferreira", "André Castro",
+    "Roberta Gomes", "Gustavo Barbosa", "Larissa Dias", "Fábio Araújo", "Juliana Moreira"
+  ];
+
+  const clients = [];
   retailers.forEach(r => {
-    for (let i = 0; i < 15; i++) {
+    // Cliente padrão
+    clients.push({ 
+      id: 'consumidor_final', 
+      retailerId: r.id, 
+      nome: 'Consumidor Final' 
+    });
+    
+    // Clientes nomeados
+    for (let i = 0; i < 20; i++) {
       const nome = nomesClientes[Math.floor(Math.random() * nomesClientes.length)];
-      clients.push({ id: generateId(), retailerId: r.id, nome: `${nome} (${r.nomeFantasia})` });
+      clients.push({ 
+        id: generateId(), 
+        retailerId: r.id, 
+        nome: `${nome}` 
+      });
     }
   });
 
-  let inventory = [];
-  retailers.forEach(r => {
-    const sample = products.sort(() => 0.5 - Math.random()).slice(0, 8);
-    sample.forEach((p, idx) => {
+  console.log(`✅ ${clients.length} clientes criados`);
+
+  // --- 6. ESTOQUE ---
+  const inventory = [];
+  retailers.forEach(retailer => {
+    products.forEach((product, idx) => {
+      const estoqueInicial = Math.floor(Math.random() * 120) + 30; // 30 a 150
+      const custoMedio = +(product.precoSugerido * 0.70).toFixed(2);
+      const precoVenda = +(product.precoSugerido * 1.22).toFixed(2);
+      
       const validade = new Date();
-      validade.setDate(validade.getDate() + Math.floor(Math.random() * 180));
+      // Bebidas e perecíveis vencem mais rápido
+      const daysUntilExpiry = product.categoria === 'Bebidas' 
+        ? Math.floor(Math.random() * 90) + 20 
+        : Math.floor(Math.random() * 365) + 60;
+      validade.setDate(validade.getDate() + daysUntilExpiry);
+      
       inventory.push({
         id: generateId(),
-        retailerId: r.id,
-        productId: p.id,
-        estoque: Math.floor(Math.random() * 100) + 20,
-        custoMedio: +(p.precoSugerido * 0.7).toFixed(2),
-        precoVenda: +(p.precoSugerido * 1.25).toFixed(2),
-        dataValidade: validade.toISOString(),
-        lote: `${r.id.toUpperCase()}-L${idx+1}-${new Date().getFullYear()}`
+        retailerId: retailer.id,
+        productId: product.id,
+        sku: product.sku,
+        nome: product.nome,
+        categoria: product.categoria,
+        subcategoria: product.subcategoria,
+        marca: product.marca,
+        industryId: product.industryId,
+        estoque: estoqueInicial,
+        custoMedio: custoMedio,
+        precoVenda: precoVenda,
+        precoSugerido: product.precoSugerido,
+        dataValidade: validade.toISOString()
       });
     });
   });
 
-  let sales = [];
-  const formasPagamento = ["Dinheiro", "Cartão Débito", "Cartão Crédito", "Pix", "Vale Alimentação"];
+  console.log(`✅ ${inventory.length} itens de estoque criados`);
 
-  for (let i = 0; i < 400; i++) {
+  // --- 7. VENDAS (2000 VENDAS!) ---
+  const sales = [];
+  const formasPagamento = ["Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pix"];
+  
+  for (let i = 0; i < 2000; i++) {
     const retailer = retailers[Math.floor(Math.random() * retailers.length)];
     const retailerInventory = inventory.filter(inv => inv.retailerId === retailer.id && inv.estoque > 0);
-    if(retailerInventory.length === 0) continue;
+    
+    if (retailerInventory.length === 0) continue;
 
-    const qtdeItens = Math.floor(Math.random() * 4) + 1; // até 5 itens
-    let itensVenda = [];
+    // Define quantos itens a venda terá (1 a 5)
+    const qtdeItens = Math.floor(Math.random() * 5) + 1;
+    const itensVenda = [];
     let totalBruto = 0;
 
     for (let j = 0; j < qtdeItens; j++) {
-      const itemToSell = retailerInventory[Math.floor(Math.random() * retailerInventory.length)];
-      const productInfo = products.find(p => p.id === itemToSell.productId);
-      const qtde = Math.floor(Math.random() * 5) + 1;
+      let itemToSell;
+      
+      // 70% de chance de vender produtos populares
+      if (Math.random() < 0.7) {
+        const popularItems = retailerInventory.filter(inv => 
+          products.find(p => p.id === inv.productId)?.popular
+        );
+        if (popularItems.length > 0) {
+          itemToSell = popularItems[Math.floor(Math.random() * popularItems.length)];
+        }
+      }
+      
+      // Fallback para produto aleatório
+      if (!itemToSell) {
+        itemToSell = retailerInventory[Math.floor(Math.random() * retailerInventory.length)];
+      }
 
+      const qtde = Math.floor(Math.random() * 4) + 1; // 1 a 4 unidades
+      
       itensVenda.push({ 
         productId: itemToSell.productId, 
-        sku: productInfo.sku, 
+        sku: itemToSell.sku, 
         qtde, 
         precoUnit: itemToSell.precoVenda 
       });
@@ -113,33 +323,64 @@ export const seedDatabase = () => {
       totalBruto += itemToSell.precoVenda * qtde;
     }
 
-    const desconto = +(totalBruto * (Math.random() * 0.1)).toFixed(2);
-    const formaPagamento = formasPagamento[Math.floor(Math.random() * formasPagamento.length)];
-    const saleDate = new Date();
-    saleDate.setDate(saleDate.getDate() - Math.floor(Math.random() * 90));
+    // Desconto aleatório em compras acima de R$ 80
+    const desconto = totalBruto > 80 
+      ? +(totalBruto * (Math.random() * 0.08)).toFixed(2) // Até 8% de desconto
+      : 0;
 
-    const sale = {
-        id: generateId(),
-        retailerId: retailer.id,
-        dataISO: saleDate.toISOString(),
-        clienteId: 'consumidor_final',
-        itens: itensVenda,
-        totalBruto,
-        desconto,
-        totalLiquido: +(totalBruto - desconto).toFixed(2),
-        formaPagamento
-    };
-    sales.push(sale);
+    const formaPagamento = formasPagamento[Math.floor(Math.random() * formasPagamento.length)];
+    
+    // Data aleatória nos últimos 180 dias
+    const saleDate = new Date();
+    const daysAgo = Math.floor(Math.random() * 180);
+    saleDate.setDate(saleDate.getDate() - daysAgo);
+
+    // Vendas maiores nos fins de semana
+    if (saleDate.getDay() === 0 || saleDate.getDay() === 6) {
+      if (Math.random() < 0.4) { // 40% de chance de item extra
+        const extraItem = retailerInventory[Math.floor(Math.random() * retailerInventory.length)];
+        itensVenda.push({ 
+          productId: extraItem.productId, 
+          sku: extraItem.sku, 
+          qtde: 1, 
+          precoUnit: extraItem.precoVenda 
+        });
+        totalBruto += extraItem.precoVenda;
+      }
+    }
+
+    sales.push({
+      id: generateId(),
+      retailerId: retailer.id,
+      dataISO: saleDate.toISOString(),
+      clienteId: 'consumidor_final',
+      itens: itensVenda,
+      totalBruto: +totalBruto.toFixed(2),
+      desconto: desconto,
+      totalLiquido: +(totalBruto - desconto).toFixed(2),
+      formaPagamento: formaPagamento
+    });
   }
-  
-  setItem('users', users); 
-  setItem('retailers', retailers); 
+
+  console.log(`✅ ${sales.length} vendas criadas`);
+
+  // --- 8. SALVANDO TUDO ---
+  setItem('users', users);
+  setItem('retailers', retailers);
   setItem('industries', industries);
-  setItem('products', products); 
-  setItem('clients', clients); 
-  setItem('inventory', inventory); 
+  setItem('products', products);
+  setItem('clients', clients);
+  setItem('inventory', inventory);
   setItem('sales', sales);
   setItem('settings', {});
 
-  console.log("LocalStorage populado com sucesso!");
+  console.log("🎉 LocalStorage populado com sucesso!");
+  console.log(`📊 RESUMO:`);
+  console.log(`   - ${users.length} usuários`);
+  console.log(`   - ${retailers.length} varejistas`);
+  console.log(`   - ${industries.length} indústrias`);
+  console.log(`   - ${products.length} produtos`);
+  console.log(`   - ${clients.length} clientes`);
+  console.log(`   - ${inventory.length} itens no estoque`);
+  console.log(`   - ${sales.length} vendas`);
 };

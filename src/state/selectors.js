@@ -1,5 +1,6 @@
-// --- ARQUIVO: src/state/selectors.js ---
+// --- ARQUIVO ATUALIZADO: src/state/selectors.js ---
 import { getItem } from './storage';
+import { differenceInDays } from 'date-fns'; // Importa a função para calcular a diferença em dias
 
 // Busca todos os atores (varejistas ou indústrias)
 export const getActorsByType = (actorType) => {
@@ -88,7 +89,7 @@ export const parseTextToCart = (text, inventory) => {
 
 
 // --------------------
-// NOVOS SELECTORS
+// SELECTORS APRIMORADOS
 // --------------------
 
 // Monta os dados de Dashboard do Varejista
@@ -137,7 +138,7 @@ export const getDashboardData = (retailerId, days = 30) => {
             if (product) {
                 const key = product.id;
                 if (!productSalesMap[key]) {
-                    productSalesMap[key] = { name: product.nome, marca: industry?.nomeFantasia || "Desconhecida", qtde: 0 };
+                    productSalesMap[key] = { id: product.id, productId: product.id, name: product.nome, marca: industry?.nomeFantasia || "Desconhecida", qtde: 0 };
                 }
                 productSalesMap[key].qtde += i.qtde;
             }
@@ -148,52 +149,107 @@ export const getDashboardData = (retailerId, days = 30) => {
     return {
         kpis: { numberOfSales, totalRevenue, averageTicket },
         charts: { salesByDay, revenueByCategory },
-        tables: { top5Products }
+        tables: { top5Products },
+        raw: { sales: filteredSales } // Exporta vendas filtradas para uso em outros seletores
     };
 };
 
 
-// Insights básicos do Assistente de Performance
+// Insights do Assistente de Performance (VERSÃO CORRIGIDA E MELHORADA)
 export const getRetailerInsights = (retailerId) => {
-    const data = getDashboardData(retailerId, 30);
+    const today = new Date();
     const insights = [];
-
-    if (data.kpis.averageTicket < 20) {
+    
+    // --- Dados Base ---
+    const dashboardData30Days = getDashboardData(retailerId, 30);
+    const inventory = getInventoryByRetailer(retailerId);
+    
+    // --- INSIGHT 1: Alerta de Estoque Baixo para Produtos Populares ---
+    const topProducts = dashboardData30Days.tables.top5Products;
+    if (topProducts.length > 0) {
+        const topProductInventory = inventory.find(i => i.productId === topProducts[0].productId);
+        if (topProductInventory && topProductInventory.estoque < 10) {
+            insights.push({ 
+                id: "insight-low-stock",
+                type: "warning", 
+                icon: "ExclamationCircle", 
+                title: "Estoque baixo do campeão de vendas",
+                description: `O produto "${topProducts[0].name}" está acabando! Considere fazer um novo pedido para não perder vendas.`,
+                metric: `Apenas ${topProductInventory.estoque} un. restantes`,
+                text: `Estoque baixo: ${topProducts[0].name} (${topProductInventory.estoque} un.)`,
+                action: { text: "Ver Estoque", link: "/retail/inventory" }
+            });
+        }
+    }
+    
+    // --- INSIGHT 2: Alerta de Produtos Próximos da Validade ---
+    const expiringSoon = inventory.find(item => 
+        item.dataValidade && 
+        differenceInDays(new Date(item.dataValidade), today) <= 15 &&
+        differenceInDays(new Date(item.dataValidade), today) > 0 
+    );
+    if (expiringSoon) {
+        const daysLeft = differenceInDays(new Date(expiringSoon.dataValidade), today);
         insights.push({ 
-            id: "insight-avg-ticket",
+            id: "insight-expiring-soon",
             type: "warning", 
             icon: "GraphDownArrow", 
-            title: "Ticket médio baixo",
-            description: "O ticket médio está abaixo de R$20. Considere oferecer promoções de venda casada ou kits de produtos.",
-            metric: `R$ ${data.kpis.averageTicket.toFixed(2)}`,
-            action: { text: "Ver vendas", link: "/retailer/sales" }
+            title: "Produto perto de vencer",
+            description: `Atenção ao produto "${expiringSoon.nome}". Crie uma promoção ou um combo para girar o estoque e evitar perdas.`,
+            metric: `Vence em ${daysLeft} dias`,
+            text: `Perto de vencer: ${expiringSoon.nome} (em ${daysLeft} dias)`,
+            action: { text: "Ver Estoque", link: "/retail/inventory" }
         });
     }
 
-    if (data.kpis.totalRevenue > 1000) {
-        insights.push({ 
-            id: "insight-revenue",
-            type: "success", 
-            icon: "GraphUpArrow", 
-            title: "Boa receita no período",
-            description: "Sua receita nos últimos 30 dias já ultrapassou R$ 1.000, continue assim!",
-            metric: `R$ ${data.kpis.totalRevenue.toFixed(2)}`,
-            action: { text: "Ver relatório", link: "/retailer/dashboard" }
-        });
-    }
+    // --- INSIGHT 3: Alerta de Estoque Parado ---
+    const salesLast30Days = dashboardData30Days.raw.sales.flatMap(s => s.itens);
+    const slowMovingItem = inventory.find(item => 
+        item.estoque > 50 && 
+        !salesLast30Days.some(sold => sold.productId === item.productId)
+    );
 
-    if (data.tables.top5Products.length > 0 && data.tables.top5Products[0].qtde > 50) {
+    if (slowMovingItem) {
         insights.push({ 
-            id: "insight-top-product",
+            id: "insight-slow-moving",
             type: "info", 
             icon: "BoxSeam", 
-            title: "Produto campeão de vendas",
-            description: `O produto mais vendido (${data.tables.top5Products[0].name}) já saiu mais de ${data.tables.top5Products[0].qtde} vezes.`,
-            metric: `${data.tables.top5Products[0].qtde} un.`,
-            action: { text: "Ver estoque", link: "/retailer/stock" }
+            title: "Estoque parado",
+            description: `O produto "${slowMovingItem.nome}" não teve vendas no último mês e possui um estoque alto. Que tal dar um destaque a ele na loja?`,
+            metric: `${slowMovingItem.estoque} un. em estoque`,
+            text: `Estoque parado: ${slowMovingItem.nome} (${slowMovingItem.estoque} un.)`,
+            action: { text: "Ver Detalhes", link: "/retail/inventory" }
         });
     }
 
+    // --- INSIGHT 4: Produto Mais Lucrativo ---
+    const profitability = {};
+    salesLast30Days.forEach(soldItem => {
+        const inventoryItem = inventory.find(i => i.productId === soldItem.productId);
+        if (inventoryItem && inventoryItem.custoMedio) {
+            const profit = (soldItem.precoUnit - inventoryItem.custoMedio) * soldItem.qtde;
+            if (!profitability[soldItem.productId]) {
+                profitability[soldItem.productId] = { name: inventoryItem.nome, totalProfit: 0 };
+            }
+            profitability[soldItem.productId].totalProfit += profit;
+        }
+    });
+
+    const mostProfitable = Object.values(profitability).sort((a,b) => b.totalProfit - a.totalProfit)[0];
+    if (mostProfitable && mostProfitable.totalProfit > 100) {
+        insights.push({ 
+            id: "insight-most-profitable",
+            type: "success", 
+            icon: "GraphUpArrow", 
+            title: "Sua mina de ouro!",
+            description: `O produto "${mostProfitable.name}" foi o que mais gerou lucro líquido no último mês. Invista na visibilidade dele!`,
+            metric: `+ R$ ${mostProfitable.totalProfit.toFixed(2)} de lucro`,
+            text: `Sua mina de ouro: ${mostProfitable.name} (+ R$ ${mostProfitable.totalProfit.toFixed(2)} de lucro)`,
+            action: { text: "Ver Dashboard", link: "/retail/dashboard" }
+        });
+    }
+
+    // --- Fallback ---
     if (insights.length === 0) {
         insights.push({
             id: "insight-none",
@@ -201,8 +257,9 @@ export const getRetailerInsights = (retailerId) => {
             icon: "ExclamationCircle",
             title: "Nenhum insight relevante",
             description: "Não encontramos insights significativos no período. Continue registrando suas vendas e movimentações.",
-            metric: "-",
-            action: { text: "Atualizar dados", link: "/retailer/dashboard" }
+            metric: "Continue registrando",
+            text: "Nenhum insight relevante no momento.",
+            action: { text: "Registrar Venda", link: "/retail/pos/traditional" }
         });
     }
 
