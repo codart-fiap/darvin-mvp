@@ -11,16 +11,13 @@ const Programs = () => {
     const [lastUpdated, setLastUpdated] = useState(Date.now()); 
     const [expandedId, setExpandedId] = useState(null);
     
-    // Estados para o Modal
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [programToJoin, setProgramToJoin] = useState(null);
 
-    // Estados para Filtros
-    const [activeTab, setActiveTab] = useState('new'); // new, in_progress, completed
+    const [activeTab, setActiveTab] = useState('new');
     const [industryFilter, setIndustryFilter] = useState('all');
     const [sortOrder, setSortOrder] = useState('endDate');
 
-    // Busca de dados
     const allPrograms = useMemo(() => {
         if (!user) return [];
         return getProgramsForRetailer(user.actorId);
@@ -33,11 +30,9 @@ const Programs = () => {
 
     const industries = useMemo(() => getActorsByType('industry'), []);
 
-    // Lógica de filtragem e ordenação
     const filteredAndSortedPrograms = useMemo(() => {
         let programs = allPrograms;
 
-        // Filtro por Status (Abas)
         if (activeTab === 'new') {
             programs = programs.filter(p => !p.isSubscribed && !p.isCompleted);
         } else if (activeTab === 'in_progress') {
@@ -46,17 +41,14 @@ const Programs = () => {
             programs = programs.filter(p => p.isCompleted);
         }
 
-        // Filtro por Indústria
         if (industryFilter !== 'all') {
             programs = programs.filter(p => p.industryId === industryFilter);
         }
 
-        // Ordenação
         programs.sort((a, b) => {
             if (sortOrder === 'endDate') {
                 return new Date(a.endDate) - new Date(b.endDate);
             }
-            // Adicionar outras lógicas de ordenação se necessário
             return 0;
         });
 
@@ -64,7 +56,6 @@ const Programs = () => {
     }, [allPrograms, activeTab, industryFilter, sortOrder]);
 
 
-    // Handlers
     const handleToggleExpand = (programId) => {
         setExpandedId(expandedId === programId ? null : programId);
     };
@@ -86,7 +77,7 @@ const Programs = () => {
         setLastUpdated(Date.now());
         setShowConfirmModal(false);
         setProgramToJoin(null);
-        setActiveTab('in_progress'); // Muda para a aba "Em Andamento"
+        setActiveTab('in_progress');
     };
 
     const RatingCard = () => (
@@ -116,7 +107,6 @@ const Programs = () => {
             
             <Row>
                 <Col lg={8}>
-                    {/* Filtros e Abas */}
                     <Card className="mb-4">
                          <Card.Header>
                             <Nav variant="tabs" activeKey={activeTab} onSelect={(k) => setActiveTab(k)} className="card-header-tabs">
@@ -148,7 +138,6 @@ const Programs = () => {
                          </Card.Body>
                     </Card>
 
-                    {/* Lista de Programas */}
                     {filteredAndSortedPrograms.length > 0 ? (
                         filteredAndSortedPrograms.map(program => (
                             <Card key={program.id} className="program-card mb-3">
@@ -157,7 +146,7 @@ const Programs = () => {
                                         <Col md={3} className="text-center">
                                              <img src={program.industryLogo} alt={`Logo ${program.industryName}`} className="program-logo mb-2"/>
                                              <div>
-                                                {program.tags?.map(tag => <Badge bg="secondary" className="me-1" key={tag}>{tag}</Badge>)}
+                                               {program.tags?.map(tag => <Badge bg="secondary" className="me-1" key={tag}>{tag}</Badge>)}
                                              </div>
                                         </Col>
                                         <Col md={9}>
@@ -177,13 +166,14 @@ const Programs = () => {
                                             <h6>Recompensa:</h6>
                                             <p className="fw-bold text-success"><small>{program.reward}</small></p>
                                             
-                                            {program.isSubscribed ? (
+                                            {program.isSubscribed && !program.isCompleted && (
                                                 <div>
                                                     <h6 className="mt-3">Seu Progresso:</h6>
                                                     <ProgressBar now={program.progress.percentage} label={`${program.progress.percentage}%`} animated variant="success"/>
                                                     <p className="text-center mt-1"><small>{program.progress.current} de {program.progress.target}</small></p>
                                                 </div>
-                                            ) : !program.isCompleted && (
+                                            )}
+                                            {!program.isSubscribed && !program.isCompleted && (
                                                 <div className="d-grid mt-3">
                                                     <Button variant="primary" onClick={() => handleShowConfirmModal(program)}>Aderir ao Programa</Button>
                                                 </div>
@@ -203,13 +193,11 @@ const Programs = () => {
                     )}
                 </Col>
 
-                {/* Coluna da Direita: Rating */}
                 <Col lg={4}>
                     <RatingCard />
                 </Col>
             </Row>
 
-            {/* Modal de Confirmação */}
             <Modal show={showConfirmModal} onHide={() => setShowConfirmModal(false)} centered>
                 <Modal.Header closeButton>
                     <Modal.Title>Confirmar Adesão</Modal.Title>

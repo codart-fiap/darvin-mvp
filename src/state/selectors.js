@@ -362,3 +362,178 @@ export const getRetailerRating = (retailerId) => {
     const sales = getSalesByRetailer(retailerId);
     return calculateRating(sales);
 };
+
+// SELECTOR PARA O DASHBOARD DA INDÚSTRIA
+// ######################################################
+export const getIndustryDashboardData = (industryId, days = 30, retailerFilter = null) => {
+    const allSales = getItem('sales') || [];
+    const allProducts = getItem('products') || [];
+    const allRetailers = getItem('retailers') || [];
+
+    // 1. Filtra apenas produtos que pertencem a esta indústria
+    const industryProductIds = allProducts
+        .filter(p => p.industryId === industryId)
+        .map(p => p.id);
+
+    // 2. Filtra as vendas que contêm produtos desta indústria e que estão no período de tempo
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    const industrySales = allSales.map(sale => {
+        const itemsFromIndustry = sale.itens.filter(item => industryProductIds.includes(item.productId));
+        if (itemsFromIndustry.length === 0) return null;
+
+        return {
+            ...sale,
+            itens: itemsFromIndustry,
+            totalLiquido: itemsFromIndustry.reduce((sum, i) => sum + (i.qtde * i.precoUnit), 0)
+        };
+    }).filter(Boolean).filter(s => new Date(s.dataISO) >= cutoffDate);
+    
+    // 3. Aplica o filtro de varejista (se houver)
+    let filteredSales = industrySales;
+    if (retailerFilter) {
+        const retailer = allRetailers.find(r => r.nomeFantasia === retailerFilter);
+        if (retailer) {
+            filteredSales = industrySales.filter(s => s.retailerId === retailer.id);
+        }
+    }
+
+    // 4. Calcula os KPIs
+    const totalRevenue = filteredSales.reduce((sum, s) => sum + s.totalLiquido, 0);
+    const totalUnitsSold = filteredSales.reduce((sum, s) => sum + s.itens.reduce((itemSum, i) => itemSum + i.qtde, 0), 0);
+    const activeRetailers = new Set(filteredSales.map(s => s.retailerId)).size;
+    const averagePricePerUnit = totalUnitsSold > 0 ? totalRevenue / totalUnitsSold : 0;
+
+    // 5. Prepara dados para os gráficos
+    // Vendas por Varejista (usando as vendas antes do filtro para manter o contexto no gráfico)
+    const salesByRetailerMap = {};
+    industrySales.forEach(sale => {
+        const retailer = allRetailers.find(r => r.id === sale.retailerId);
+        if(retailer) {
+            salesByRetailerMap[retailer.nomeFantasia] = (salesByRetailerMap[retailer.nomeFantasia] || 0) + sale.totalLiquido;
+        }
+    });
+    const salesByRetailer = Object.keys(salesByRetailerMap).map(name => ({ name, Receita: salesByRetailerMap[name] })).sort((a, b) => b.Receita - a.Receita);
+
+    // Receita por Produto
+    const revenueByProductMap = {};
+    filteredSales.forEach(sale => {
+        sale.itens.forEach(item => {
+            const product = allProducts.find(p => p.id === item.productId);
+            if(product) {
+                revenueByProductMap[product.nome] = (revenueByProductMap[product.nome] || 0) + (item.qtde * item.precoUnit);
+            }
+        });
+    });
+    const revenueByProduct = Object.keys(revenueByProductMap).map(name => ({ name, Receita: revenueByProductMap[name] }));
+
+    // 6. Prepara dados para as tabelas
+    // Top 5 Produtos
+    const productSalesMap = {};
+    filteredSales.forEach(sale => {
+        sale.itens.forEach(item => {
+            const product = allProducts.find(p => p.id === item.productId);
+            if(product) {
+                productSalesMap[product.nome] = (productSalesMap[product.nome] || 0) + item.qtde;
+            }
+        });
+    });
+    const topProducts = Object.keys(productSalesMap).map(name => ({ name, qtde: productSalesMap[name] })).sort((a,b) => b.qtde - a.qtde).slice(0, 5);
+
+    // Top 5 Varejistas (baseado nas vendas filtradas)
+    const retailerRevenueMap = {};
+     filteredSales.forEach(sale => {
+        const retailer = allRetailers.find(r => r.id === sale.retailerId);
+        if(retailer) {
+            retailerRevenueMap[retailer.nomeFantasia] = (retailerRevenueMap[retailer.nomeFantasia] || 0) + sale.totalLiquido;
+        }
+    });
+    const topRetailers = Object.keys(retailerRevenueMap).map(name => ({ name, revenue: retailerRevenueMap[name] })).sort((a,b) => b.revenue - a.revenue).slice(0, 5);
+
+
+    return {
+        kpis: { totalRevenue, totalUnitsSold, activeRetailers, averagePricePerUnit },
+        charts: { salesByRetailer, revenueByProduct },
+        tables: { topProducts, topRetailers },
+    };
+};
+
+// SELECTOR PARA O DARVIN VISION (ANÁLISES AVANÇADAS)
+// ######################################################
+export const getDarvinVisionData = (industryId) => {
+    const allSales = getItem('sales') || [];
+    const allProducts = getItem('products') || [];
+    const allRetailers = getItem('retailers') || [];
+
+    // Filtra apenas produtos e vendas relevantes para esta indústria
+    const industryProductIds = allProducts.filter(p => p.industryId === industryId).map(p => p.id);
+    const industrySales = allSales.map(sale => {
+        const itemsFromIndustry = sale.itens.filter(item => industryProductIds.includes(item.productId));
+        if (itemsFromIndustry.length === 0) return null;
+        return { ...sale, itens: itemsFromIndustry };
+    }).filter(Boolean);
+
+    // --- Análise 1: Combos de Vendas (Market Basket Analysis Simplificado) ---
+    const comboCounts = {};
+    industrySales.forEach(sale => {
+        if (sale.itens.length > 1) {
+            const productIds = sale.itens.map(item => item.productId).sort(); // Ordenar para evitar pares duplicados (A,B vs B,A)
+            for (let i = 0; i < productIds.length; i++) {
+                for (let j = i + 1; j < productIds.length; j++) {
+                    const pair = `${productIds[i]}|${productIds[j]}`;
+                    comboCounts[pair] = (comboCounts[pair] || 0) + 1;
+                }
+            }
+        }
+    });
+
+    const salesCombos = Object.keys(comboCounts)
+        .map(pair => {
+            const [idA, idB] = pair.split('|');
+            return {
+                productA_id: idA,
+                productB_id: idB,
+                productA_name: allProducts.find(p => p.id === idA)?.nome || 'Produto A',
+                productB_name: allProducts.find(p => p.id === idB)?.nome || 'Produto B',
+                count: comboCounts[pair]
+            };
+        })
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5); // Pega os 5 combos mais frequentes
+
+    // --- Análise 2: Vendas por Região ---
+    const regionSales = {};
+    industrySales.forEach(sale => {
+        const retailer = allRetailers.find(r => r.id === sale.retailerId);
+        if (retailer) {
+            const uf = retailer.endereco.uf;
+            if (!regionSales[uf]) {
+                regionSales[uf] = { totalRevenue: 0, totalUnits: 0 };
+            }
+            sale.itens.forEach(item => {
+                regionSales[uf].totalRevenue += item.qtde * item.precoUnit;
+                regionSales[uf].totalUnits += item.qtde;
+            });
+        }
+    });
+
+    const salesByRegion = Object.keys(regionSales)
+        .map(uf => ({ uf, ...regionSales[uf] }))
+        .sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+    // --- Análise 3: Vendas por Dia da Semana ---
+    const weekdaySales = { 'Dom': 0, 'Seg': 0, 'Ter': 0, 'Qua': 0, 'Qui': 0, 'Sex': 0, 'Sáb': 0 };
+    const weekdayOrder = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    industrySales.forEach(sale => {
+        const dayIndex = new Date(sale.dataISO).getDay();
+        const dayName = weekdayOrder[dayIndex];
+        const saleTotal = sale.itens.reduce((sum, i) => sum + (i.qtde * i.precoUnit), 0);
+        weekdaySales[dayName] += saleTotal;
+    });
+    
+    const salesByWeekday = weekdayOrder.map(day => ({ day, Receita: weekdaySales[day] }));
+
+
+    return { salesCombos, salesByRegion, salesByWeekday };
+};

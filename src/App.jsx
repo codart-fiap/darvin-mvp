@@ -1,4 +1,4 @@
-// --- ARQUIVO: src/App.jsx ---
+// --- ARQUIVO ATUALIZADO E CORRIGIDO: src/App.jsx ---
 // --- TECNOLOGIA: React, JSX, JavaScript, React Router ---
 
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
@@ -13,14 +13,15 @@ import DashboardRetail from './pages/retail/DashboardRetail';
 import TraditionalPOS from './pages/retail/pos/TraditionalPOS';
 import ChatbotPOS from './pages/retail/pos/ChatbotPOS';
 import UploadPOS from './pages/retail/pos/UploadPOS';
-import OnlineSheetPOS from './pages/retail/pos/OnlineSheetPOS'; // <-- ADICIONADO
+import OnlineSheetPOS from './pages/retail/pos/OnlineSheetPOS';
 import Inventory from './pages/retail/Inventory';
 import Programs from './pages/retail/Programs';
 import SettingsRetail from './pages/retail/SettingsRetail';
 import Assistant from './pages/retail/Assistant';
 
-// Componente "placeholder" para a seção da Indústria.
-const IndustryDashboard = () => <div>Dashboard da Indústria (em construção)</div>;
+// Páginas da Indústria
+import DashboardIndustry from './pages/industry/DashboardIndustry';
+import DarvinVision from './pages/industry/DarvinVision'; 
 
 function App() {
   return (
@@ -40,15 +41,14 @@ function App() {
           <Route path="/retail/pos/traditional" element={<TraditionalPOS />} />
           <Route path="/retail/pos/chatbot" element={<ChatbotPOS />} />
           <Route path="/retail/pos/upload" element={<UploadPOS />} />
-          <Route path="/retail/pos/online-sheet" element={<OnlineSheetPOS />} /> {/* <-- ADICIONADO */}
+          <Route path="/retail/pos/online-sheet" element={<OnlineSheetPOS />} />
           <Route path="/retail/inventory" element={<Inventory />} />
-          {/* A ROTA PARA O CONECTA FOI REMOVIDA DAQUI */}
           <Route path="/retail/programs" element={<Programs />} />
           <Route path="/retail/settings" element={<SettingsRetail />} />
           <Route path="/retail/assistant" element={<Assistant />} />
         </Route>
         
-        {/* --- ROTAS PROTEGIDAS PARA INDÚSTRIA (Exemplo) --- */}
+        {/* --- ROTAS PROTEGIDAS PARA INDÚSTRIA --- */}
          <Route 
           element={
             <ProtectedRoute allowedRoles={['industry']}>
@@ -56,7 +56,9 @@ function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="/industry/dashboard" element={<IndustryDashboard />} />
+          {/* Ambas as rotas da indústria devem estar aqui dentro */}
+          <Route path="/industry/dashboard" element={<DashboardIndustry />} />
+          <Route path="/industry/vision" element={<DarvinVision />} />
         </Route>
 
         {/* --- ROTA PADRÃO --- */}
