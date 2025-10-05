@@ -378,10 +378,27 @@ export const seedDatabase = () => {
       }
     }
 
-    // 60% identificados, 40% consumidor final
-    const cliente = Math.random() > 0.4 
-        ? retailerClients[Math.floor(Math.random() * retailerClients.length)].id
-        : 'consumidor_final_' + retailer.id;
+    // 65% identificados com perfil, 35% consumidor final
+    // Clientes com hábito "Compra Semanal" e "Diário" compram mais frequentemente
+    let cliente;
+    const namedClients = retailerClients.filter(c => c.id !== 'consumidor_final_' + retailer.id);
+    
+    if (Math.random() > 0.35 && namedClients.length > 0) {
+        // Preferência por clientes com hábitos frequentes
+        const frequentBuyers = namedClients.filter(c => 
+            c.habitoCompra === 'Compra Semanal' || 
+            c.habitoCompra === 'Diário' ||
+            c.habitoCompra === 'Fim de Semana'
+        );
+        
+        if (frequentBuyers.length > 0 && Math.random() > 0.3) {
+            cliente = frequentBuyers[Math.floor(Math.random() * frequentBuyers.length)].id;
+        } else {
+            cliente = namedClients[Math.floor(Math.random() * namedClients.length)].id;
+        }
+    } else {
+        cliente = 'consumidor_final_' + retailer.id;
+    }
 
     sales.push({
       id: generateId(),
@@ -397,6 +414,71 @@ export const seedDatabase = () => {
   }
 
   console.log(`✅ ${sales.length} vendas criadas`);
+
+  // --- 7.5. HISTÓRICO DE COMPRAS POR CLIENTE (NOVO!) ---
+  const customerPurchaseHistory = {};
+  
+  sales.forEach(sale => {
+    if (sale.clienteId && !sale.clienteId.startsWith('consumidor_final')) {
+      if (!customerPurchaseHistory[sale.clienteId]) {
+        customerPurchaseHistory[sale.clienteId] = {
+          clientId: sale.clienteId,
+          totalPurchases: 0,
+          totalSpent: 0,
+          favoriteProducts: {},
+          favoriteCategories: {},
+          averageTicket: 0,
+          firstPurchase: sale.dataISO,
+          lastPurchase: sale.dataISO,
+          purchases: []
+        };
+      }
+      
+      const history = customerPurchaseHistory[sale.clienteId];
+      history.totalPurchases++;
+      history.totalSpent += sale.totalLiquido;
+      history.lastPurchase = sale.dataISO;
+      
+      if (new Date(sale.dataISO) < new Date(history.firstPurchase)) {
+        history.firstPurchase = sale.dataISO;
+      }
+      
+      // Registra produtos favoritos
+      sale.itens.forEach(item => {
+        const product = products.find(p => p.id === item.productId);
+        if (product) {
+          history.favoriteProducts[product.nome] = (history.favoriteProducts[product.nome] || 0) + item.qtde;
+          history.favoriteCategories[product.categoria] = (history.favoriteCategories[product.categoria] || 0) + item.qtde;
+        }
+      });
+      
+      history.purchases.push({
+        date: sale.dataISO,
+        total: sale.totalLiquido,
+        items: sale.itens.length
+      });
+    }
+  });
+  
+  // Calcula ticket médio e ordena favoritos
+  Object.values(customerPurchaseHistory).forEach(history => {
+    history.averageTicket = history.totalSpent / history.totalPurchases;
+    
+    // Converte favoritos em arrays ordenados
+    history.topProducts = Object.entries(history.favoriteProducts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, qtde]) => ({ name, qtde }));
+    
+    history.topCategories = Object.entries(history.favoriteCategories)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, qtde]) => ({ name, qtde }));
+    
+    delete history.favoriteProducts;
+    delete history.favoriteCategories;
+  });
+
+  console.log(`✅ ${Object.keys(customerPurchaseHistory).length} históricos de clientes criados`);
 
   // --- 8. PROGRAMAS DE INCENTIVO ---
   const programs = [
@@ -558,6 +640,7 @@ export const seedDatabase = () => {
   setItem('sales', sales);
   setItem('programs', programs);
   setItem('programSubscriptions', programSubscriptions);
+  setItem('customerPurchaseHistory', Object.values(customerPurchaseHistory)); // NOVO
   setItem('settings', {});
 
   console.log("✅ Banco de dados populado com sucesso!");
@@ -571,4 +654,5 @@ export const seedDatabase = () => {
   console.log(`   - ${sales.length} vendas`);
   console.log(`   - ${programs.length} programas de incentivo`);
   console.log(`   - ${programSubscriptions.length} inscrições em programas`);
+  console.log(`   - ${Object.keys(customerPurchaseHistory).length} históricos de clientes`);
 };
