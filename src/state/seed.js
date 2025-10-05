@@ -1,4 +1,4 @@
-// --- ARQUIVO: src/state/seed.js - VERSÃO EXPANDIDA ---
+// --- ARQUIVO: src/state/seed.js - VERSÃO EXPANDIDA MESCLADA ---
 import { setItem } from './storage';
 import { generateId } from '../utils/ids';
 import logoBoreal from '../assets/images/logos/logoBoreal.png';
@@ -37,7 +37,7 @@ export const seedDatabase = () => {
     },
   ];
 
-  // --- 2. VAREJOS ---
+  // --- 2. VAREJOS (EXPANDIDO) ---
   const retailers = [
     { 
       id: 'ret1', nomeFantasia: 'Mercearia Bom Preço', razaoSocial: 'Mercearia Bom Preço Ltda ME', cnpj: '33.333.333/0001-33',
@@ -49,16 +49,30 @@ export const seedDatabase = () => {
       endereco: { logradouro: 'Avenida Principal, 500', bairro: 'Centro', cidade: 'Rio de Janeiro', uf: 'RJ', cep: '20040-000' },
       tipo: 'Supermercado', contato: { telefone: '21 91234-5678', email: 'bruno@mercadocentral.com' } 
     },
+    { 
+      id: 'ret3', nomeFantasia: 'Empório Santa Rosa', razaoSocial: 'Empório Santa Rosa Ltda', cnpj: '55.555.555/0001-55',
+      endereco: { logradouro: 'Rua das Rosas, 123', bairro: 'Jardim Europa', cidade: 'Belo Horizonte', uf: 'MG', cep: '30130-000' },
+      tipo: 'Empório', contato: { telefone: '31 99999-8888', email: 'carlos@santarosa.com' } 
+    },
+    { 
+      id: 'ret4', nomeFantasia: 'Supermercado Família', razaoSocial: 'Supermercado Família Ltda', cnpj: '66.666.666/0001-66',
+      endereco: { logradouro: 'Av. dos Trabalhadores, 2000', bairro: 'Industrial', cidade: 'Curitiba', uf: 'PR', cep: '80215-000' },
+      tipo: 'Supermercado', contato: { telefone: '41 93333-4444', email: 'daniela@familia.com' } 
+    },
   ];
 
-  // --- 3. USUÁRIOS ---
+  // --- 3. USUÁRIOS (EXPANDIDO) ---
   const users = [
     { id: generateId(), email: 'ana@mercearia.com', password: '123', role: 'retail', actorId: 'ret1', displayName: 'Ana (Bom Preço)' },
     { id: generateId(), email: 'bruno@mercadocentral.com', password: '123', role: 'retail', actorId: 'ret2', displayName: 'Bruno (Central)' },
+    { id: generateId(), email: 'carlos@santarosa.com', password: '123', role: 'retail', actorId: 'ret3', displayName: 'Carlos (Santa Rosa)' },
+    { id: generateId(), email: 'daniela@familia.com', password: '123', role: 'retail', actorId: 'ret4', displayName: 'Daniela (Família)' },
     { id: generateId(), email: 'bi@borealbebidas.com', password: '123', role: 'industry', actorId: 'ind1', displayName: 'BI (Boreal)' },
+    { id: generateId(), email: 'contato@docevida.com', password: '123', role: 'industry', actorId: 'ind2', displayName: 'Gestor (DoceVida)' },
+    { id: generateId(), email: 'vendas@limpmax.com', password: '123', role: 'industry', actorId: 'ind3', displayName: 'Vendas (LimpMax)' },
   ];
 
-  // --- 4. PRODUTOS (EXPANDIDO PARA ~80 PRODUTOS) ---
+  // --- 4. PRODUTOS (85 PRODUTOS) ---
   const products = [];
   
   // BEBIDAS - Boreal (25 produtos)
@@ -220,17 +234,26 @@ export const seedDatabase = () => {
 
   console.log(`✅ ${products.length} produtos criados`);
 
-  // --- 5. CLIENTES ---
+  // --- 5. CLIENTES (EXPANDIDO - 50 por varejista) ---
   const clients = [];
-  const nomesMasculinos = ["João", "Pedro", "Carlos", "Lucas", "José", "Rafael", "Paulo", "André", "Gustavo", "Fábio"];
-  const nomesFemininos = ["Maria", "Ana", "Fernanda", "Mariana", "Patrícia", "Beatriz", "Carla", "Roberta", "Larissa", "Juliana"];
-  const sobrenomes = ["Silva", "Santos", "Oliveira", "Costa", "Souza", "Lima", "Alves", "Rocha", "Pereira", "Mendes"];
-  const habitos = ["Compra Semanal", "Fim de Semana", "Noturno", "Ocasional", "Promocional"];
+  const nomesMasculinos = ["João", "Pedro", "Carlos", "Lucas", "José", "Rafael", "Paulo", "André", "Gustavo", "Fábio", "Roberto", "Fernando", "Marcos", "Daniel", "Eduardo"];
+  const nomesFemininos = ["Maria", "Ana", "Fernanda", "Mariana", "Patrícia", "Beatriz", "Carla", "Roberta", "Larissa", "Juliana", "Cristina", "Sandra", "Gabriela", "Luciana", "Adriana"];
+  const sobrenomes = ["Silva", "Santos", "Oliveira", "Costa", "Souza", "Lima", "Alves", "Rocha", "Pereira", "Mendes", "Ferreira", "Rodrigues", "Martins", "Araújo", "Ribeiro"];
+  const habitos = ["Compra Semanal", "Fim de Semana", "Noturno", "Ocasional", "Promocional", "Diário"];
 
   retailers.forEach(r => {
-    clients.push({ id: 'consumidor_final', retailerId: r.id, nome: 'Consumidor Final' });
+    // Consumidor final sempre presente
+    clients.push({ 
+      id: 'consumidor_final_' + r.id, 
+      retailerId: r.id, 
+      nome: 'Consumidor Final',
+      sexo: 'Não informado',
+      idade: null,
+      habitoCompra: 'Ocasional'
+    });
     
-    for (let i = 0; i < 20; i++) {
+    // 50 clientes por varejista
+    for (let i = 0; i < 50; i++) {
         const sexo = Math.random() > 0.5 ? 'Masculino' : 'Feminino';
         const nome = sexo === 'Masculino' 
             ? nomesMasculinos[Math.floor(Math.random() * nomesMasculinos.length)]
@@ -242,7 +265,7 @@ export const seedDatabase = () => {
             retailerId: r.id, 
             nome: `${nome} ${sobrenome}`,
             sexo: sexo,
-            idade: Math.floor(Math.random() * 50) + 18, // 18 a 67 anos
+            idade: Math.floor(Math.random() * 55) + 18, // 18 a 72 anos
             habitoCompra: habitos[Math.floor(Math.random() * habitos.length)]
         });
     }
@@ -253,13 +276,12 @@ export const seedDatabase = () => {
   // --- 6. ESTOQUE ---
   const inventory = [];
   retailers.forEach(retailer => {
-    products.forEach((product, idx) => {
-      const estoqueInicial = Math.floor(Math.random() * 120) + 30; // 30 a 150
+    products.forEach((product) => {
+      const estoqueInicial = Math.floor(Math.random() * 150) + 30; // 30 a 180
       const custoMedio = +(product.precoSugerido * 0.70).toFixed(2);
       const precoVenda = +(product.precoSugerido * 1.22).toFixed(2);
       
       const validade = new Date();
-      // Bebidas e perecíveis vencem mais rápido
       const daysUntilExpiry = product.categoria === 'Bebidas' 
         ? Math.floor(Math.random() * 90) + 20 
         : Math.floor(Math.random() * 365) + 60;
@@ -286,24 +308,25 @@ export const seedDatabase = () => {
 
   console.log(`✅ ${inventory.length} itens de estoque criados`);
 
-  // --- 7. VENDAS (2000 VENDAS!) ---
+  // --- 7. VENDAS (4000 VENDAS!) ---
   const sales = [];
   const formasPagamento = ["Dinheiro", "Cartão de Débito", "Cartão de Crédito", "Pix"];
   
-  for (let i = 0; i < 2000; i++) {
+  for (let i = 0; i < 4000; i++) {
     const retailer = retailers[Math.floor(Math.random() * retailers.length)];
     const retailerInventory = inventory.filter(inv => inv.retailerId === retailer.id && inv.estoque > 0);
     const retailerClients = clients.filter(c => c.retailerId === retailer.id);
     
     if (retailerInventory.length === 0) continue;
 
-    const qtdeItens = Math.floor(Math.random() * 5) + 1;
+    const qtdeItens = Math.floor(Math.random() * 6) + 1; // 1 a 6 itens
     const itensVenda = [];
     let totalBruto = 0;
 
     for (let j = 0; j < qtdeItens; j++) {
       let itemToSell;
       
+      // 70% de chance de vender produtos populares
       if (Math.random() < 0.7) {
         const popularItems = retailerInventory.filter(inv => 
           products.find(p => p.id === inv.productId)?.popular
@@ -317,7 +340,7 @@ export const seedDatabase = () => {
         itemToSell = retailerInventory[Math.floor(Math.random() * retailerInventory.length)];
       }
 
-      const qtde = Math.floor(Math.random() * 4) + 1;
+      const qtde = Math.floor(Math.random() * 5) + 1; // 1 a 5 unidades
       
       itensVenda.push({ 
         productId: itemToSell.productId, 
@@ -329,31 +352,36 @@ export const seedDatabase = () => {
       totalBruto += itemToSell.precoVenda * qtde;
     }
 
+    // Desconto para compras acima de R$ 80
     const desconto = totalBruto > 80 
-      ? +(totalBruto * (Math.random() * 0.08)).toFixed(2)
+      ? +(totalBruto * (Math.random() * 0.10)).toFixed(2)
       : 0;
 
     const formaPagamento = formasPagamento[Math.floor(Math.random() * formasPagamento.length)];
+    
+    // Distribuir vendas nos últimos 240 dias (8 meses)
     const saleDate = new Date();
-    const daysAgo = Math.floor(Math.random() * 180);
+    const daysAgo = Math.floor(Math.random() * 240);
     saleDate.setDate(saleDate.getDate() - daysAgo);
 
+    // Aumentar vendas em fins de semana
     if (saleDate.getDay() === 0 || saleDate.getDay() === 6) {
-      if (Math.random() < 0.4) {
+      if (Math.random() < 0.5) {
         const extraItem = retailerInventory[Math.floor(Math.random() * retailerInventory.length)];
         itensVenda.push({ 
           productId: extraItem.productId, 
           sku: extraItem.sku, 
-          qtde: 1, 
+          qtde: Math.floor(Math.random() * 2) + 1, 
           precoUnit: extraItem.precoVenda 
         });
-        totalBruto += extraItem.precoVenda;
+        totalBruto += extraItem.precoVenda * itensVenda[itensVenda.length - 1].qtde;
       }
     }
 
+    // 60% identificados, 40% consumidor final
     const cliente = Math.random() > 0.4 
         ? retailerClients[Math.floor(Math.random() * retailerClients.length)].id
-        : 'consumidor_final';
+        : 'consumidor_final_' + retailer.id;
 
     sales.push({
       id: generateId(),
@@ -368,8 +396,10 @@ export const seedDatabase = () => {
     });
   }
 
+  console.log(`✅ ${sales.length} vendas criadas`);
+
   // --- 8. PROGRAMAS DE INCENTIVO ---
-   const programs = [
+  const programs = [
     {
       id: 'prog1',
       industryId: 'ind1',
@@ -383,7 +413,7 @@ export const seedDatabase = () => {
       metric: {
         type: 'percentual_venda_categoria',
         categories: ['Refrigerantes', 'Sucos'],
-        target: 1.20 // Aumento de 20%
+        target: 1.20
       }
     },
     {
@@ -396,13 +426,13 @@ export const seedDatabase = () => {
       reward: '1 caixa de Biscoito Recheado Chocolate grátis.',
       startDate: '2025-09-15T00:00:00.000Z',
       endDate: '2025-11-15T23:59:59.000Z',
-       metric: {
+      metric: {
         type: 'volume_compra_categoria',
         categories: ['Biscoitos'],
         target: 10
       }
     },
-     {
+    {
       id: 'prog3',
       industryId: 'ind3',
       title: 'Faxina Premiada LimpMax',
@@ -420,7 +450,7 @@ export const seedDatabase = () => {
     },
     {
       id: 'prog4',
-      industryId: 'ind4', // BelezaPura
+      industryId: 'ind4',
       title: 'Lançamento BelezaPura Hidratação',
       tags: ['Lançamento', 'Higiene'],
       description: 'Compre e venda a nova linha de Shampoos e Condicionadores para ganhar visibilidade extra.',
@@ -433,13 +463,92 @@ export const seedDatabase = () => {
         skus: { 'HIG0005': 5, 'HIG0006': 5 },
         target: 1
       }
+    },
+    {
+      id: 'prog5',
+      industryId: 'ind1',
+      title: 'Mega Desconto Boreal',
+      tags: ['Promoção', 'Bebidas'],
+      description: 'Compre em volume e ganhe desconto progressivo.',
+      rules: 'Compras acima de 100 unidades de qualquer produto Boreal ganham 5% de desconto. Acima de 200 unidades, 10% de desconto.',
+      reward: 'Desconto de 5% a 10% no próximo pedido.',
+      startDate: '2025-10-15T00:00:00.000Z',
+      endDate: '2025-12-31T23:59:59.000Z',
+      metric: {
+        type: 'volume_compra_marca',
+        marca: 'Boreal',
+        target: 100
+      }
+    },
+    {
+      id: 'prog6',
+      industryId: 'ind2',
+      title: 'Combo Café da Manhã DoceVida',
+      tags: ['Combo', 'Alimentos'],
+      description: 'Venda mais combos de café da manhã e ganhe bonificação.',
+      rules: 'Para cada combo vendido contendo Café + Biscoito + Açúcar DoceVida, acumule pontos. 30 pontos = R$ 50 em crédito.',
+      reward: 'R$ 50 em crédito a cada 30 combos vendidos.',
+      startDate: '2025-09-01T00:00:00.000Z',
+      endDate: '2025-11-30T23:59:59.000Z',
+      metric: {
+        type: 'combo_venda',
+        skus: ['ALI0018', 'ALI0001', 'ALI0021'],
+        target: 30
+      }
     }
   ];
 
-  // --- 9. INSCRIÇÕES NOS PROGRAMAS ---
-  const programSubscriptions = [];
+  console.log(`✅ ${programs.length} programas de incentivo criados`);
 
-  // --- 10. SALVANDO TUDO ---
+  // --- 9. INSCRIÇÕES NOS PROGRAMAS (ALGUNS VAREJOS JÁ INSCRITOS) ---
+  const programSubscriptions = [
+    {
+      id: generateId(),
+      programId: 'prog1',
+      retailerId: 'ret1',
+      subscriptionDate: '2025-10-02T10:00:00.000Z',
+      status: 'active'
+    },
+    {
+      id: generateId(),
+      programId: 'prog1',
+      retailerId: 'ret2',
+      subscriptionDate: '2025-10-03T14:30:00.000Z',
+      status: 'active'
+    },
+    {
+      id: generateId(),
+      programId: 'prog2',
+      retailerId: 'ret1',
+      subscriptionDate: '2025-09-16T09:00:00.000Z',
+      status: 'active'
+    },
+    {
+      id: generateId(),
+      programId: 'prog3',
+      retailerId: 'ret3',
+      subscriptionDate: '2025-10-01T11:00:00.000Z',
+      status: 'active'
+    },
+    {
+      id: generateId(),
+      programId: 'prog5',
+      retailerId: 'ret2',
+      subscriptionDate: '2025-10-16T08:00:00.000Z',
+      status: 'active'
+    },
+    {
+      id: generateId(),
+      programId: 'prog5',
+      retailerId: 'ret4',
+      subscriptionDate: '2025-10-17T15:00:00.000Z',
+      status: 'active'
+    }
+  ];
+
+  console.log(`✅ ${programSubscriptions.length} inscrições em programas criadas`);
+
+  // --- 10. SALVANDO TUDO NO LOCALSTORAGE ---
   setItem('users', users);
   setItem('retailers', retailers);
   setItem('industries', industries);
@@ -451,5 +560,15 @@ export const seedDatabase = () => {
   setItem('programSubscriptions', programSubscriptions);
   setItem('settings', {});
 
-  console.log(`✅ ${sales.length} vendas criadas`);
+  console.log("✅ Banco de dados populado com sucesso!");
+  console.log(`📊 Resumo:`);
+  console.log(`   - ${industries.length} indústrias`);
+  console.log(`   - ${retailers.length} varejos`);
+  console.log(`   - ${users.length} usuários`);
+  console.log(`   - ${products.length} produtos`);
+  console.log(`   - ${clients.length} clientes`);
+  console.log(`   - ${inventory.length} itens em estoque`);
+  console.log(`   - ${sales.length} vendas`);
+  console.log(`   - ${programs.length} programas de incentivo`);
+  console.log(`   - ${programSubscriptions.length} inscrições em programas`);
 };
