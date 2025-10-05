@@ -459,26 +459,31 @@ export const getIndustryDashboardData = (industryId, days = 30, retailerFilter =
     };
 };
 
-// SELECTOR PARA O DARVIN VISION (ANÁLISES AVANÇADAS)
-// ######################################################
+// SELECTOR PARA O DARVIN VISION (ANÁLISES AVANÇADAS) - VERSÃO COMPLETA E CORRIGIDA
+// ##############################################################################
 export const getDarvinVisionData = (industryId) => {
     const allSales = getItem('sales') || [];
     const allProducts = getItem('products') || [];
     const allRetailers = getItem('retailers') || [];
+    const allClients = getItem('clients') || [];
+    const customerHistory = getItem('customerPurchaseHistory') || [];
 
     // Filtra apenas produtos e vendas relevantes para esta indústria
     const industryProductIds = allProducts.filter(p => p.industryId === industryId).map(p => p.id);
     const industrySales = allSales.map(sale => {
         const itemsFromIndustry = sale.itens.filter(item => industryProductIds.includes(item.productId));
-        if (itemsFromIndustry.length === 0) return null;
-        return { ...sale, itens: itemsFromIndustry };
+        if (itemsFromIndustry.length === 0 || !sale.clienteId || sale.clienteId.startsWith('consumidor_final')) {
+            return null;
+        }
+        const industryRevenue = itemsFromIndustry.reduce((sum, i) => sum + (i.qtde * i.precoUnit), 0);
+        return { ...sale, itens: itemsFromIndustry, industryRevenue };
     }).filter(Boolean);
 
     // --- Análise 1: Combos de Vendas (Market Basket Analysis Simplificado) ---
     const comboCounts = {};
     industrySales.forEach(sale => {
         if (sale.itens.length > 1) {
-            const productIds = sale.itens.map(item => item.productId).sort(); // Ordenar para evitar pares duplicados (A,B vs B,A)
+            const productIds = sale.itens.map(item => item.productId).sort();
             for (let i = 0; i < productIds.length; i++) {
                 for (let j = i + 1; j < productIds.length; j++) {
                     const pair = `${productIds[i]}|${productIds[j]}`;
@@ -492,15 +497,13 @@ export const getDarvinVisionData = (industryId) => {
         .map(pair => {
             const [idA, idB] = pair.split('|');
             return {
-                productA_id: idA,
-                productB_id: idB,
                 productA_name: allProducts.find(p => p.id === idA)?.nome || 'Produto A',
                 productB_name: allProducts.find(p => p.id === idB)?.nome || 'Produto B',
                 count: comboCounts[pair]
             };
         })
         .sort((a, b) => b.count - a.count)
-        .slice(0, 5); // Pega os 5 combos mais frequentes
+        .slice(0, 5);
 
     // --- Análise 2: Vendas por Região ---
     const regionSales = {};
@@ -508,32 +511,134 @@ export const getDarvinVisionData = (industryId) => {
         const retailer = allRetailers.find(r => r.id === sale.retailerId);
         if (retailer) {
             const uf = retailer.endereco.uf;
-            if (!regionSales[uf]) {
-                regionSales[uf] = { totalRevenue: 0, totalUnits: 0 };
-            }
-            sale.itens.forEach(item => {
-                regionSales[uf].totalRevenue += item.qtde * item.precoUnit;
-                regionSales[uf].totalUnits += item.qtde;
-            });
+            if (!regionSales[uf]) regionSales[uf] = { totalRevenue: 0, totalUnits: 0 };
+            regionSales[uf].totalRevenue += sale.industryRevenue;
+            regionSales[uf].totalUnits += sale.itens.reduce((sum, i) => sum + i.qtde, 0);
         }
     });
 
-    const salesByRegion = Object.keys(regionSales)
-        .map(uf => ({ uf, ...regionSales[uf] }))
-        .sort((a, b) => b.totalRevenue - a.totalRevenue);
+    const salesByRegion = Object.keys(regionSales).map(uf => ({ uf, ...regionSales[uf] })).sort((a, b) => b.totalRevenue - a.totalRevenue);
 
     // --- Análise 3: Vendas por Dia da Semana ---
     const weekdaySales = { 'Dom': 0, 'Seg': 0, 'Ter': 0, 'Qua': 0, 'Qui': 0, 'Sex': 0, 'Sáb': 0 };
     const weekdayOrder = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     industrySales.forEach(sale => {
         const dayIndex = new Date(sale.dataISO).getDay();
-        const dayName = weekdayOrder[dayIndex];
-        const saleTotal = sale.itens.reduce((sum, i) => sum + (i.qtde * i.precoUnit), 0);
-        weekdaySales[dayName] += saleTotal;
+        weekdaySales[weekdayOrder[dayIndex]] += sale.industryRevenue;
     });
     
     const salesByWeekday = weekdayOrder.map(day => ({ day, Receita: weekdaySales[day] }));
 
+    // --- NOVAS ANÁLISES DEMOGRÁFICAS E DE PREFERÊNCIA ---
 
-    return { salesCombos, salesByRegion, salesByWeekday };
+    const getAgeGroup = (age) => {
+        if (age <= 25) return '18-25';
+        if (age <= 35) return '26-35';
+        if (age <= 45) return '36-45';
+        if (age <= 55) return '46-55';
+        return '55+';
+    };
+
+    const demographicSales = { byGender: {}, byAge: {}, byHabit: {} };
+    const customerSpending = {};
+    const favoritesByProfile = { byGender: {}, byAgeGroup: {}, byHabit: {} };
+
+    industrySales.forEach(sale => {
+        const client = allClients.find(c => c.id === sale.clienteId);
+        if (!client) return;
+
+        // Agregação para gráficos demográficos
+        if (client.sexo) {
+            demographicSales.byGender[client.sexo] = (demographicSales.byGender[client.sexo] || 0) + sale.industryRevenue;
+        }
+        if (client.idade) {
+            const ageGroup = getAgeGroup(client.idade);
+            demographicSales.byAge[ageGroup] = (demographicSales.byAge[ageGroup] || 0) + sale.industryRevenue;
+        }
+        if (client.habitoCompra) {
+            demographicSales.byHabit[client.habitoCompra] = (demographicSales.byHabit[client.habitoCompra] || 0) + sale.industryRevenue;
+        }
+        
+        // Agregação para Top Clientes
+        customerSpending[client.id] = (customerSpending[client.id] || 0) + sale.industryRevenue;
+
+        // Agregação para Preferências por Perfil
+        sale.itens.forEach(item => {
+            const product = allProducts.find(p => p.id === item.productId);
+            if (!product) return;
+
+            // Por Gênero
+            if (client.sexo) {
+                if (!favoritesByProfile.byGender[client.sexo]) favoritesByProfile.byGender[client.sexo] = {};
+                favoritesByProfile.byGender[client.sexo][product.nome] = (favoritesByProfile.byGender[client.sexo][product.nome] || 0) + item.qtde;
+            }
+            // Por Faixa Etária
+            if (client.idade) {
+                const ageGroup = getAgeGroup(client.idade);
+                if (!favoritesByProfile.byAgeGroup[ageGroup]) favoritesByProfile.byAgeGroup[ageGroup] = {};
+                favoritesByProfile.byAgeGroup[ageGroup][product.nome] = (favoritesByProfile.byAgeGroup[ageGroup][product.nome] || 0) + item.qtde;
+            }
+            // Por Hábito
+             if (client.habitoCompra) {
+                if (!favoritesByProfile.byHabit[client.habitoCompra]) favoritesByProfile.byHabit[client.habitoCompra] = {};
+                favoritesByProfile.byHabit[client.habitoCompra][product.nome] = (favoritesByProfile.byHabit[client.habitoCompra][product.nome] || 0) + item.qtde;
+            }
+        });
+    });
+
+    // Formatação dos dados para os componentes
+    const salesByGender = Object.keys(demographicSales.byGender).map(name => ({ name, Receita: demographicSales.byGender[name], percentage: 0 }));
+    const totalGenderRevenue = salesByGender.reduce((sum, i) => sum + i.Receita, 0);
+    salesByGender.forEach(item => item.percentage = Math.round((item.Receita / totalGenderRevenue) * 100));
+
+    const salesByAge = Object.keys(demographicSales.byAge).map(name => ({ name, Receita: demographicSales.byAge[name] }));
+    const salesByHabit = Object.keys(demographicSales.byHabit).map(name => ({ name, Receita: demographicSales.byHabit[name] }));
+
+    const topCustomers = Object.keys(customerSpending)
+        .map(clientId => {
+            const client = allClients.find(c => c.id === clientId);
+            const history = customerHistory.find(h => h.clientId === clientId);
+            return {
+                id: clientId,
+                name: client?.nome,
+                gender: client?.sexo,
+                age: client?.idade,
+                habit: client?.habitoCompra,
+                totalSpent: customerSpending[clientId],
+                purchases: history?.totalPurchases || 0,
+                averageTicket: history?.averageTicket || 0
+            };
+        })
+        .sort((a, b) => b.totalSpent - a.totalSpent)
+        .slice(0, 10);
+
+    // Processar e ordenar os favoritos
+    const processFavorites = (favObject) => {
+        const result = {};
+        for (const segment in favObject) {
+            result[segment] = Object.keys(favObject[segment])
+                .map(productName => ({ name: productName, qtde: favObject[segment][productName] }))
+                .sort((a, b) => b.qtde - a.qtde)
+                .slice(0, 3); // Top 3
+        }
+        return result;
+    }
+    
+    const processedFavorites = {
+        byGender: processFavorites(favoritesByProfile.byGender),
+        byAgeGroup: processFavorites(favoritesByProfile.byAgeGroup),
+        byHabit: processFavorites(favoritesByProfile.byHabit),
+    };
+
+    return { 
+        salesCombos, 
+        salesByRegion, 
+        salesByWeekday,
+        // Novos dados retornados
+        salesByGender,
+        salesByAge,
+        salesByHabit,
+        topCustomers,
+        favoritesByProfile: processedFavorites
+    };
 };
