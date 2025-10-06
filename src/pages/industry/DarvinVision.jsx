@@ -1,9 +1,21 @@
-// --- ARQUIVO COMPLETO: src/pages/industry/DarvinVision.jsx ---
+// --- ARQUIVO ATUALIZADO E CORRIGIDO: src/pages/industry/DarvinVision.jsx ---
 import React, { useMemo, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getDarvinVisionData } from '../../state/selectors';
-import { Container, Row, Col, Card, Table, Alert, Badge, Tabs, Tab } from 'react-bootstrap';
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Container, Row, Col, Card, Table, Alert, Badge, Tabs, Tab, ListGroup } from 'react-bootstrap';
+import {
+    BarChart,
+    Bar,
+    PieChart,
+    Pie,
+    Cell,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer } from 'recharts';
+import { BarChartLineFill, PeopleFill, GeoAltFill, Basket2Fill, Bullseye, ArrowUpRightCircleFill } from 'react-bootstrap-icons';
 
 const COLORS = ['#0d6efd', '#6f42c1', '#d63384', '#fd7e14', '#198754', '#ffc107', '#20c997', '#dc3545'];
 
@@ -20,14 +32,14 @@ const DarvinVision = () => {
         return <Container className="mt-4"><Alert variant="info">Analisando dados...</Alert></Container>;
     }
 
-    const { 
-        salesCombos = [], 
-        salesByRegion = [], 
+    const {
+        salesCombos = [],
+        salesByRegion = [],
         salesByWeekday = [],
         salesByGender = [],
         salesByAge = [],
         salesByHabit = [],
-        topCustomers = [],
+        allCustomers = [], // <-- CORREÇÃO APLICADA AQUI
         favoritesByProfile = { byGender: {}, byAgeGroup: {}, byHabit: {} }
     } = visionData || {};
 
@@ -42,7 +54,7 @@ const DarvinVision = () => {
 
             <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k)} className="mb-4">
                 {/* TAB 1: COMPORTAMENTO DE COMPRA */}
-                <Tab eventKey="comportamento" title="🛒 Comportamento de Compra">
+                <Tab eventKey="comportamento" title={<><Basket2Fill className="me-2" /> Comportamento de Compra</>}>
                     <Row>
                         {/* Análise de Cesta */}
                         <Col lg={6} className="mb-4">
@@ -169,7 +181,7 @@ const DarvinVision = () => {
                 </Tab>
 
                 {/* TAB 2: PERFIL DEMOGRÁFICO */}
-                <Tab eventKey="demografico" title="👥 Perfil Demográfico">
+                <Tab eventKey="demografico" title={<><PeopleFill className="me-2" /> Perfil Demográfico</>}>
                     <Row>
                         {/* Vendas por Gênero */}
                         <Col md={4} className="mb-4">
@@ -178,12 +190,12 @@ const DarvinVision = () => {
                                     <Card.Title>Vendas por Gênero</Card.Title>
                                     <ResponsiveContainer width="100%" height={280}>
                                         <PieChart>
-                                            <Pie 
-                                                data={salesByGender} 
-                                                dataKey="Receita" 
-                                                nameKey="name" 
-                                                cx="50%" 
-                                                cy="50%" 
+                                            <Pie
+                                                data={salesByGender}
+                                                dataKey="Receita"
+                                                nameKey="name"
+                                                cx="50%"
+                                                cy="50%"
                                                 outerRadius={90}
                                                 label={({ name, percentage }) => `${name} (${percentage}%)`}
                                             >
@@ -231,96 +243,41 @@ const DarvinVision = () => {
                 </Tab>
 
                 {/* TAB 3: OPORTUNIDADES DE MERCADO */}
-                <Tab eventKey="oportunidades" title="🎯 Oportunidades de Mercado">
+                <Tab eventKey="oportunidades" title={<><Bullseye className="me-2" /> Oportunidades de Mercado</>}>
                     <Row>
-                        {/* Top Clientes por Receita */}
-                        <Col md={12} className="mb-4">
-                            <Card>
-                                <Card.Body>
-                                    <Card.Title>Top 10 Clientes por Receita</Card.Title>
-                                    <Card.Subtitle className="mb-3 text-muted">
-                                        Seus consumidores mais valiosos - Foque neles!
-                                    </Card.Subtitle>
-                                    {topCustomers.length > 0 ? (
-                                        <Table striped hover responsive>
-                                            <thead>
-                                                <tr>
-                                                    <th>#</th>
-                                                    <th>Cliente</th>
-                                                    <th>Perfil</th>
-                                                    <th className="text-center">Compras</th>
-                                                    <th>Receita Total</th>
-                                                    <th>Ticket Médio</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {topCustomers.map((customer, index) => (
-                                                    <tr key={index}>
-                                                        <td>
-                                                            {index < 3 ? (
-                                                                <Badge bg={index === 0 ? 'warning' : index === 1 ? 'secondary' : 'danger'}>
-                                                                    {index + 1}º
-                                                                </Badge>
-                                                            ) : (
-                                                                <span>{index + 1}</span>
-                                                            )}
-                                                        </td>
-                                                        <td><strong>{customer.name}</strong></td>
-                                                        <td>
-                                                            <small>
-                                                                {customer.gender && <Badge bg="info" className="me-1">{customer.gender}</Badge>}
-                                                                {customer.age && <Badge bg="secondary" className="me-1">{customer.age} anos</Badge>}
-                                                                {customer.habit && <Badge bg="success">{customer.habit}</Badge>}
-                                                            </small>
-                                                        </td>
-                                                        <td className="text-center">{customer.purchases}</td>
-                                                        <td><strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(customer.totalSpent)}</strong></td>
-                                                        <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(customer.averageTicket)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </Table>
-                                    ) : (
-                                        <Alert variant="info">Não há dados suficientes de clientes identificados</Alert>
-                                    )}
-                                    <Alert variant="warning" className="mt-3">
-                                        <strong>💡 Estratégia:</strong> Crie programas de fidelidade personalizados para seus top clientes e aumente o LTV (Lifetime Value).
-                                    </Alert>
-                                </Card.Body>
-                            </Card>
-                        </Col>
-
                         {/* Segmentos com Maior Potencial */}
                         <Col md={6} className="mb-4">
                             <Card className="h-100">
                                 <Card.Body>
-                                    <Card.Title>Segmentos Demográficos de Alto Valor</Card.Title>
+                                    <Card.Title><BarChartLineFill className="me-2" />Segmentos de Alto Valor</Card.Title>
                                     <Card.Subtitle className="mb-3 text-muted">
-                                        Onde investir suas campanhas de marketing
+                                        Direcione suas campanhas para os perfis mais lucrativos.
                                     </Card.Subtitle>
-                                    <div className="mb-3">
-                                        <h6 className="text-muted mb-2">Por Gênero:</h6>
-                                        {salesByGender.map((item, idx) => (
-                                            <div key={idx} className="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
-                                                <div>
-                                                    <Badge bg="primary" className="me-2">{item.name}</Badge>
-                                                    <span className="text-muted">{item.percentage}% da receita</span>
+                                    <ListGroup variant="flush">
+                                        <ListGroup.Item>
+                                            <h6 className="text-muted mb-2">Por Gênero (Maior Receita):</h6>
+                                            {salesByGender.slice(0, 1).map((item, idx) => (
+                                                <div key={idx} className="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                                                    <div>
+                                                        <Badge bg="primary" className="me-2 fs-6">{item.name}</Badge>
+                                                        <span className="text-muted">{item.percentage}% da receita</span>
+                                                    </div>
+                                                    <strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.Receita)}</strong>
                                                 </div>
-                                                <strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.Receita)}</strong>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div>
-                                        <h6 className="text-muted mb-2">Por Faixa Etária (Top 3):</h6>
-                                        {salesByAge.slice(0, 3).map((item, idx) => (
-                                            <div key={idx} className="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
-                                                <Badge bg="success" className="me-2">{item.name} anos</Badge>
-                                                <strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.Receita)}</strong>
-                                            </div>
-                                        ))}
-                                    </div>
+                                            ))}
+                                        </ListGroup.Item>
+                                        <ListGroup.Item>
+                                            <h6 className="text-muted mb-2">Por Faixa Etária (Top 1):</h6>
+                                            {salesByAge.slice(0, 1).map((item, idx) => (
+                                                <div key={idx} className="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                                                    <Badge bg="success" className="me-2 fs-6">{item.name} anos</Badge>
+                                                    <strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.Receita)}</strong>
+                                                </div>
+                                            ))}
+                                        </ListGroup.Item>
+                                    </ListGroup>
                                     <Alert variant="success" className="mt-3">
-                                        <strong>💡 Ação:</strong> Concentre 70% do budget de marketing nos segmentos de maior receita.
+                                        <strong><ArrowUpRightCircleFill className="me-2" />Ação:</strong> Concentre o orçamento de marketing nos segmentos de maior receita para maximizar o ROI.
                                     </Alert>
                                 </Card.Body>
                             </Card>
@@ -330,30 +287,32 @@ const DarvinVision = () => {
                         <Col md={6} className="mb-4">
                             <Card className="h-100">
                                 <Card.Body>
-                                    <Card.Title>Potencial de Cross-Selling</Card.Title>
+                                    <Card.Title><Basket2Fill className="me-2" />Potencial de Cross-Selling</Card.Title>
                                     <Card.Subtitle className="mb-3 text-muted">
-                                        Combos frequentes revelam oportunidades
+                                        Crie combos e kits com base nos produtos mais vendidos juntos.
                                     </Card.Subtitle>
                                     {salesCombos.length > 0 ? (
                                         <>
-                                            {salesCombos.slice(0, 3).map((combo, idx) => (
-                                                <div key={idx} className="mb-3 p-3 border rounded">
-                                                    <div className="d-flex justify-content-between align-items-center mb-2">
-                                                        <Badge bg="primary">Combo #{idx + 1}</Badge>
-                                                        <Badge bg="secondary">{combo.count}x vendidos juntos</Badge>
-                                                    </div>
-                                                    <div className="small">
-                                                        <div>📦 {combo.productA_name}</div>
-                                                        <div>📦 {combo.productB_name}</div>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                            <ListGroup>
+                                                {salesCombos.slice(0, 3).map((combo, idx) => (
+                                                    <ListGroup.Item key={idx} className="mb-2 border rounded">
+                                                        <div className="d-flex justify-content-between align-items-center mb-2">
+                                                            <Badge bg="primary">Combo #{idx + 1}</Badge>
+                                                            <Badge bg="secondary" pill>{combo.count}x vendidos</Badge>
+                                                        </div>
+                                                        <div className="small">
+                                                            <div>- {combo.productA_name}</div>
+                                                            <div>- {combo.productB_name}</div>
+                                                        </div>
+                                                    </ListGroup.Item>
+                                                ))}
+                                            </ListGroup>
                                             <Alert variant="info" className="mt-3">
-                                                <strong>💡 Oportunidade:</strong> Crie kits promocionais com estes produtos ou incentive varejos a posicioná-los próximos.
+                                                <strong><ArrowUpRightCircleFill className="me-2" />Oportunidade:</strong> Incentive os varejistas a posicionar estes produtos próximos ou crie kits promocionais.
                                             </Alert>
                                         </>
                                     ) : (
-                                        <Alert variant="warning">Dados insuficientes para análise de cross-selling</Alert>
+                                        <Alert variant="warning">Dados insuficientes para análise de cross-selling.</Alert>
                                     )}
                                 </Card.Body>
                             </Card>
@@ -363,39 +322,26 @@ const DarvinVision = () => {
                         <Col md={12} className="mb-4">
                             <Card>
                                 <Card.Body>
-                                    <Card.Title>Penetração de Mercado por Região</Card.Title>
+                                    <Card.Title><GeoAltFill className="me-2" />Penetração de Mercado por Região</Card.Title>
                                     <Card.Subtitle className="mb-3 text-muted">
-                                        Identifique regiões com potencial de expansão
+                                        Identifique regiões com potencial de expansão.
                                     </Card.Subtitle>
-                                    <Table responsive striped>
-                                        <thead>
-                                            <tr>
-                                                <th>Região</th>
-                                                <th>Receita</th>
-                                                <th className="text-center">Unidades</th>
-                                                <th className="text-center">Preço Médio</th>
-                                                <th>Potencial</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {salesByRegion.map((region, idx) => {
-                                                const avgPrice = region.totalRevenue / region.totalUnits;
-                                                const potential = idx === 0 ? 'Alto' : idx < 3 ? 'Médio' : 'Explorar';
-                                                const potentialColor = idx === 0 ? 'success' : idx < 3 ? 'warning' : 'info';
-                                                return (
-                                                    <tr key={region.uf}>
-                                                        <td><Badge bg="secondary">{region.uf}</Badge></td>
-                                                        <td><strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(region.totalRevenue)}</strong></td>
-                                                        <td className="text-center">{region.totalUnits}</td>
-                                                        <td className="text-center">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(avgPrice)}</td>
-                                                        <td><Badge bg={potentialColor}>{potential}</Badge></td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </Table>
+                                    <ListGroup horizontal className="mb-3">
+                                        {salesByRegion.map((region, idx) => {
+                                            const potential = idx === 0 ? 'Alto' : idx < 3 ? 'Médio' : 'A Explorar';
+                                            const potentialColor = idx === 0 ? 'success' : idx < 3 ? 'warning' : 'info';
+                                            return (
+                                            <ListGroup.Item key={region.uf} className="flex-fill text-center">
+                                                <h5><Badge bg="secondary">{region.uf}</Badge></h5>
+                                                <div><strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(region.totalRevenue)}</strong></div>
+                                                <div className="text-muted small">{region.totalUnits} un.</div>
+                                                <div className="mt-2"><Badge bg={potentialColor}>{potential}</Badge></div>
+                                            </ListGroup.Item>
+                                            );
+                                        })}
+                                    </ListGroup>
                                     <Alert variant="success" className="mt-3">
-                                        <strong>💡 Estratégia:</strong> Regiões com baixo volume mas alto preço médio indicam mercado premium. Regiões com baixo volume E baixo preço precisam de mais investimento em presença de marca.
+                                        <strong><ArrowUpRightCircleFill className="me-2" />Estratégia:</strong> Regiões com baixo volume mas alto preço médio indicam um mercado premium a ser explorado. Considere campanhas de marketing direcionadas para regiões com potencial "A Explorar".
                                     </Alert>
                                 </Card.Body>
                             </Card>
@@ -525,53 +471,6 @@ const DarvinVision = () => {
                     </Row>
                 </Tab>
             </Tabs>
-
-            {/* Card de Resumo Executivo */}
-            <Row>
-                <Col md={12}>
-                    <Card bg="light">
-                        <Card.Body>
-                            <Card.Title>📊 Resumo Executivo - Darvin Vision</Card.Title>
-                            <Row>
-                                <Col md={2}>
-                                    <div className="text-center p-3">
-                                        <h4>{salesCombos.length}</h4>
-                                        <small className="text-muted">Combos Identificados</small>
-                                    </div>
-                                </Col>
-                                <Col md={2}>
-                                    <div className="text-center p-3">
-                                        <h4>{topCustomers.length}</h4>
-                                        <small className="text-muted">Top Clientes</small>
-                                    </div>
-                                </Col>
-                                <Col md={2}>
-                                    <div className="text-center p-3">
-                                        <h4>{salesByRegion.length}</h4>
-                                        <small className="text-muted">Regiões Ativas</small>
-                                    </div>
-                                </Col>
-                                <Col md={3}>
-                                    <div className="text-center p-3">
-                                        <h4>{salesByGender.length + salesByAge.length}</h4>
-                                        <small className="text-muted">Segmentos Demográficos</small>
-                                    </div>
-                                </Col>
-                                <Col md={3}>
-                                    <div className="text-center p-3">
-                                        <h4>{salesByHabit.length}</h4>
-                                        <small className="text-muted">Perfis de Comportamento</small>
-                                    </div>
-                                </Col>
-                            </Row>
-                            <Alert variant="info" className="mt-3 mb-0">
-                                <strong>🎯 Próximos Passos:</strong> Use estas análises para criar campanhas de marketing segmentadas, 
-                                programas de fidelidade personalizados e estratégias de penetração de mercado mais eficazes.
-                            </Alert>
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row>
         </Container>
     );
 };

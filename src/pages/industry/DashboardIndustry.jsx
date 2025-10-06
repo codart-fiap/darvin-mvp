@@ -20,6 +20,12 @@ const DashboardIndustry = () => {
         return getIndustryDashboardData(user.actorId, period, retailerFilter);
     }, [user, period, retailerFilter]);
 
+    // --- ATUALIZAÇÃO APLICADA AQUI ---
+    // Função para formatar os rótulos do gráfico de pizza
+    const renderCustomizedLabel = ({ name, value }) => {
+        return `${name}: R$${value.toFixed(2)}`;
+    };
+
     if (!dashboardData) {
         return <Container>Carregando dados da indústria...</Container>;
     }
@@ -85,7 +91,17 @@ const DashboardIndustry = () => {
                             <Card.Title>Receita por Produto</Card.Title>
                             <ResponsiveContainer width="100%" height={300}>
                                 <PieChart>
-                                    <Pie data={charts.revenueByProduct} dataKey="Receita" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                                    {/* --- ATUALIZAÇÃO APLICADA AQUI --- */}
+                                    <Pie 
+                                        data={charts.revenueByProduct} 
+                                        dataKey="Receita" 
+                                        nameKey="name" 
+                                        cx="50%" 
+                                        cy="50%" 
+                                        outerRadius={100} 
+                                        labelLine={false}
+                                        label={renderCustomizedLabel} // Usa a função de formatação
+                                    >
                                         {charts.revenueByProduct.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}

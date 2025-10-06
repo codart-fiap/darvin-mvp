@@ -1,57 +1,44 @@
 /* --- ARQUIVO: src/assets/css/custom.css --- */
 /* --- TECNOLOGIA: CSS --- */
-/* Este arquivo contém todos os nossos estilos personalizados para dar ao aplicativo
-   uma aparência única, moderna e consistente, muitas vezes sobrescrevendo ou
-   complementando os estilos padrão da biblioteca Bootstrap. */
 
-/* Importa uma fonte mais moderna (Inter) do Google Fonts para ser usada no projeto. */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-/* 1. DEFINIÇÃO DO NOSSO "DESIGN SYSTEM" COM VARIÁVEIS CSS */
-/* `:root` é um seletor que se refere ao elemento raiz do documento (o <html>).
-   Usamos ele para definir variáveis CSS globais, que podem ser reutilizadas em todo o arquivo.
-   Isso torna a manutenção do design muito mais fácil. Se quisermos mudar a cor principal,
-   só precisamos mudar em um lugar! */
 :root {
-    --primary-color: #0d6efd;      /* Cor principal (azul) */
-    --primary-hover: #0b5ed7;     /* Cor principal quando o mouse está sobre */
-    --background-light: #f8f9fa;  /* Cor de fundo clara para o conteúdo */
-    --background-sidebar: #1e293b;/* Cor de fundo escura para a barra lateral */
-    --text-color-dark: #334155;   /* Cor de texto principal (escura) */
-    --text-color-light: #f8fafc;  /* Cor de texto para fundos escuros (clara) */
-    --border-color: #e2e8f0;      /* Cor para bordas sutis */
-    --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); /* Sombra padrão para cards */
-    --border-radius: 0.5rem;      /* Raio de borda padrão para cantos arredondados */
+    --primary-color: #0d6efd;
+    --primary-hover: #0b5ed7;
+    --background-light: #f8f9fa;
+    --background-sidebar: #1e293b;
+    --text-color-dark: #334155;
+    --text-color-light: #f8fafc;
+    --border-color: #e2e8f0;
+    --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --border-radius: 0.5rem;
 }
 
-/* 2. ESTILOS GLOBAIS */
 body {
-    background-color: var(--background-light); /* Usa a variável de cor de fundo */
-    font-family: 'Inter', sans-serif;         /* Usa a fonte que importamos */
-    color: var(--text-color-dark);            /* Usa a variável de cor de texto */
+    background-color: var(--background-light);
+    font-family: 'Inter', sans-serif;
+    color: var(--text-color-dark);
 }
 
-/* Estilo para o container principal da aplicação, usando flexbox para
-   colocar a sidebar e o conteúdo lado a lado. */
 .app-container {
     display: flex;
     width: 100%;
 }
 
-/* Estilo para o container do conteúdo principal. */
+/* --- ATUALIZAÇÃO APLICADA AQUI --- */
 .content-container {
-    flex-grow: 1; /* Faz com que este elemento ocupe todo o espaço restante */
-    padding: 2rem; /* Adiciona um respiro interno */
-    height: 100vh; /* Altura igual à da janela */
-    overflow-y: auto; /* Adiciona uma barra de rolagem vertical se o conteúdo for muito grande */
+    flex-grow: 1;
+    padding: 2rem;
+    height: 100vh;
+    overflow-y: auto; /* Mantém a rolagem vertical */
+    overflow-x: hidden; /* Impede que o conteúdo "vaze" para os lados e quebre o layout */
 }
 
-/* 3. MODERNIZAÇÃO DOS COMPONENTES BOOTSTRAP */
-/* Aqui, nós customizamos a aparência de alguns componentes do Bootstrap. */
 .card {
-    border: none; /* Remove a borda padrão do card. */
-    border-radius: var(--border-radius); /* Usa nossa variável para cantos arredondados. */
-    box-shadow: var(--card-shadow); /* Usa nossa variável de sombra. */
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
 }
 
 .btn-primary {
@@ -59,40 +46,36 @@ body {
     font-weight: 500;
 }
 
-/* 4. ESTILOS PARA O NOVO SIDEBAR */
+/* --- ATUALIZAÇÃO APLICADA AQUI --- */
 .sidebar {
     background-color: var(--background-sidebar);
     color: var(--text-color-light);
-    min-height: 100vh; /* Garante que a sidebar sempre ocupe a altura total da tela. */
+    min-height: 100vh;
     width: 250px;
     padding: 1.5rem;
+    flex-shrink: 0; /* Garante que a sidebar NUNCA encolha */
 }
 
 .sidebar .nav-link {
-    color: #cbd5e1; /* Uma cor de texto clara, mas não totalmente branca. */
+    color: #cbd5e1;
     padding: 0.75rem 1rem;
     border-radius: var(--border-radius);
     margin-bottom: 0.5rem;
-    display: flex; /* Para alinhar o ícone e o texto. */
+    display: flex;
     align-items: center;
-    gap: 0.75rem; /* Espaçamento entre o ícone e o texto. */
+    gap: 0.75rem;
 }
 
 .sidebar .nav-link:hover {
-    background-color: #334155; /* Muda o fundo ao passar o mouse. */
+    background-color: #334155;
     color: white;
 }
 
-/* Estilo para o link que está ativo (correspondente à página atual). */
 .sidebar .nav-link.active {
     background-color: var(--primary-color);
     color: white;
     font-weight: 600;
 }
-
-/* ... (e assim por diante, com estilos para outras partes da UI como
-       cards de produto, interface de chat, marketplace e cards de insights) ... */
-
 
 .sidebar-title {
     color: white;
@@ -100,7 +83,7 @@ body {
     text-align: center;
 }
 
-/* 5. Estilos para os Cards de Produto no PDV */
+/* --- DEMAIS ESTILOS (PERMANECEM IGUAIS) --- */
 .product-card {
     cursor: pointer;
     transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
@@ -117,7 +100,6 @@ body {
     background-color: #eee;
 }
 
-/* 6. Estilos para a interface de Chat ("Anota Aí") */
 .chat-container {
     display: flex;
     flex-direction: column;
@@ -159,7 +141,6 @@ body {
     border-top: 1px solid var(--border-color);
 }
 
-/* 7. Estilos para a Vitrine do Marketplace */
 .category-card, .supplier-card {
     text-align: center;
     padding: 1.5rem 1rem;
@@ -183,18 +164,17 @@ body {
     color: var(--primary-color);
 }
 
-/* 8. Estilos para os Cards do Assistente de Performance */
 .insight-card {
     border-left: 5px solid var(--border-color);
 }
 .insight-card.alert-success {
-    border-left-color: #198754; /* Verde */
+    border-left-color: #198754;
 }
 .insight-card.alert-warning {
-    border-left-color: #ffc107; /* Amarelo */
+    border-left-color: #ffc107;
 }
 .insight-card.alert-info {
-    border-left-color: #0dcaf0; /* Azul claro */
+    border-left-color: #0dcaf0;
 }
 .insight-card .card-footer {
     background-color: transparent;
@@ -212,51 +192,35 @@ body {
     text-align: center;
 }
 
-.insight-card .card-footer {
-    background-color: transparent;
-    border-top: 1px solid var(--border-color);
-}
-.insight-card-metric {
-/* ... existing code ... */
-    width: 100%;
-    text-align: center;
-}
-
-/* 9. Estilos para o Carrinho do PDV (Comanda) */
-/* Define uma altura fixa para o card do carrinho, baseada na altura da janela. */
 .pos-cart {
     height: calc(100vh - 110px);
 }
 
-/* Transforma o corpo do card em um container flexível vertical. */
 .pos-cart .card-body {
     display: flex;
     flex-direction: column;
-    height: 100%; /* Garante que o corpo ocupe toda a altura do card. */
-    padding: 1rem; /* Adiciona um respiro interno. */
+    height: 100%;
+    padding: 1rem;
 }
 
-/* Estiliza a área da lista de itens. */
 .pos-cart-items {
-    flex-grow: 1; /* Faz esta área crescer para ocupar todo o espaço livre. */
-    overflow-y: auto; /* Adiciona a barra de rolagem vertical quando necessário. */
-    min-height: 0; /* Correção crucial para evitar que o container "vaze" em um layout flex. */
+    flex-grow: 1;
+    overflow-y: auto;
+    min-height: 0;
 }
 
-/* Estiliza a área do rodapé do carrinho (total, botões, etc.). */
 .pos-cart-footer {
-    flex-shrink: 0; /* Impede que o rodapé seja "esmagado" ou encolhido. */
-    padding-top: 1rem; /* Adiciona um espaço acima do total. */
+    flex-shrink: 0;
+    padding-top: 1rem;
 }
 
-/* 10. Estilos para a tela de Upload de Planilha */
 .upload-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 2rem;
-    height: 100%; /* Ocupa toda a altura disponível no content-container */
+    height: 100%;
 }
 
 .drop-zone {
@@ -302,25 +266,6 @@ body {
     font-weight: 500;
 }
 
-/* 11. ESTILOS PARA OS CARDS DE PROGRAMAS DE INCENTIVO */
-.program-card {
-    transition: all 0.3s ease-in-out;
-}
-
-.program-card .program-logo {
-    max-height: 50px;
-    width: auto;
-    max-width: 150px;
-    object-fit: contain;
-}
-
-.program-card .card-footer {
-    background-color: #f8f9fa; /* Um cinza bem claro para destacar */
-}
-
-/* --- ADICIONAR AO FINAL DE src/assets/css/custom.css --- */
-
-/* 11. ESTILOS PARA OS CARDS DE PROGRAMAS DE INCENTIVO (ATUALIZADO) */
 .program-card {
     transition: all 0.3s ease-in-out;
 }
@@ -333,10 +278,9 @@ body {
 }
 
 .program-card .card-footer {
-    background-color: #f8f9fa; /* Um cinza bem claro para destacar */
+    background-color: #f8f9fa;
 }
 
-/* 12. ESTILOS PARA A PÁGINA DE PROGRAMAS E RATING */
 .nav-tabs .nav-link {
     color: var(--text-color-dark);
 }
