@@ -560,7 +560,12 @@ export const getDarvinVisionData = (industryId) => {
         }
         
         // Agregação para Top Clientes
-        customerSpending[client.id] = (customerSpending[client.id] || 0) + sale.industryRevenue;
+        if (!customerSpending[client.id]) {
+            customerSpending[client.id] = { totalSpent: 0, retailers: {} };
+        }
+        customerSpending[client.id].totalSpent += sale.industryRevenue;
+        customerSpending[client.id].retailers[sale.retailerId] = (customerSpending[client.id].retailers[sale.retailerId] || 0) + 1;
+
 
         // Agregação para Preferências por Perfil
         sale.itens.forEach(item => {
@@ -594,23 +599,34 @@ export const getDarvinVisionData = (industryId) => {
     const salesByAge = Object.keys(demographicSales.byAge).map(name => ({ name, Receita: demographicSales.byAge[name] }));
     const salesByHabit = Object.keys(demographicSales.byHabit).map(name => ({ name, Receita: demographicSales.byHabit[name] }));
 
-    const topCustomers = Object.keys(customerSpending)
+    // --- ATUALIZAÇÃO AQUI: Gera a lista completa de clientes com dados anonimizados ---
+    const allCustomers = Object.keys(customerSpending)
         .map(clientId => {
             const client = allClients.find(c => c.id === clientId);
             const history = customerHistory.find(h => h.clientId === clientId);
+
+            // Encontra a loja onde o cliente mais comprou
+            const favoriteRetailerId = Object.keys(customerSpending[clientId].retailers).sort((a, b) => 
+                customerSpending[clientId].retailers[b] - customerSpending[clientId].retailers[a]
+            )[0];
+            const favoriteRetailer = allRetailers.find(r => r.id === favoriteRetailerId);
+
             return {
                 id: clientId,
-                name: client?.nome,
+                code: `CLIENTE-${clientId.slice(-4).toUpperCase()}`, // Código anônimo
                 gender: client?.sexo,
                 age: client?.idade,
                 habit: client?.habitoCompra,
-                totalSpent: customerSpending[clientId],
+                city: favoriteRetailer?.endereco.cidade,
+                favoriteStore: favoriteRetailer?.nomeFantasia,
+                totalSpent: customerSpending[clientId].totalSpent,
                 purchases: history?.totalPurchases || 0,
-                averageTicket: history?.averageTicket || 0
+                averageTicket: history?.averageTicket || 0,
+                lastPurchases: history?.purchases.slice(-3) || [] // Pega as últimas 3 compras
             };
         })
-        .sort((a, b) => b.totalSpent - a.totalSpent)
-        .slice(0, 10);
+        .sort((a, b) => b.totalSpent - a.totalSpent);
+
 
     // Processar e ordenar os favoritos
     const processFavorites = (favObject) => {
@@ -634,11 +650,10 @@ export const getDarvinVisionData = (industryId) => {
         salesCombos, 
         salesByRegion, 
         salesByWeekday,
-        // Novos dados retornados
         salesByGender,
         salesByAge,
         salesByHabit,
-        topCustomers,
+        allCustomers, // Retorna a lista completa ao invés de topCustomers
         favoritesByProfile: processedFavorites
     };
 };
