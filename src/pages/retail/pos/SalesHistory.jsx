@@ -29,11 +29,11 @@ const SalesHistory = () => {
       .filter(sale => sale.retailerId === user.actorId)
       .map(sale => {
         // Determina origem baseado na forma de pagamento
-        let origin = 'NATIVA';
+        let origin = 'PDV';
         if (sale.formaPagamento === 'Upload de Planilha') {
           origin = 'IMPORTADA';
-        } else if (sale.formaPagamento === 'Planilha Online') {
-          origin = 'PLANILHA';
+        } else if (sale.formaPagamento === 'Anota Aí') {
+          origin = 'ANOTA AÍ';
         }
 
         // Calcula totais CORRETAMENTE
@@ -241,8 +241,8 @@ const SalesHistory = () => {
                 onChange={(e) => setOriginFilter(e.target.value)}
               >
                 <option value="Todas">Todas as origens</option>
-                <option value="NATIVA">Nativa (PDV)</option>
-                <option value="PLANILHA">Planilha Online</option>
+                <option value="PDV">PDV Tradicional</option>
+                <option value="ANOTA AÍ">Anota Aí</option>
                 <option value="IMPORTADA">Importada</option>
               </Form.Select>
             </Col>
@@ -299,8 +299,8 @@ const SalesHistory = () => {
                     <td className="align-middle">
                       <Badge 
                         bg={
-                          sale.origin === 'NATIVA' ? 'primary' : 
-                          sale.origin === 'PLANILHA' ? 'success' : 
+                          sale.origin === 'PDV' ? 'primary' : 
+                          sale.origin === 'ANOTA AÍ' ? 'success' : 
                           'info'
                         }
                         className="px-3 py-2"
@@ -401,8 +401,8 @@ const SalesHistory = () => {
                       <small className="text-muted d-block">Origem</small>
                       <Badge 
                         bg={
-                          saleDetails.origin === 'NATIVA' ? 'primary' : 
-                          saleDetails.origin === 'PLANILHA' ? 'success' : 
+                          saleDetails.origin === 'PDV' ? 'primary' : 
+                          saleDetails.origin === 'ANOTA AÍ' ? 'success' : 
                           'info'
                         }
                         className="px-3 py-2"

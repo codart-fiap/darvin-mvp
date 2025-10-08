@@ -1,9 +1,6 @@
 // --- ARQUIVO ATUALIZADO: src/App.jsx ---
-// --- TECNOLOGIA: React, JSX, JavaScript, React Router ---
-
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
-// Importamos todos os componentes que servirão como páginas.
 import Login from './pages/auth/Login';
 import AppLayout from './layouts/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -11,7 +8,6 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Páginas do Varejo
 import DashboardRetail from './pages/retail/DashboardRetail';
 import TraditionalPOS from './pages/retail/pos/TraditionalPOS';
-import ChatbotPOS from './pages/retail/pos/ChatbotPOS';
 import UploadPOS from './pages/retail/pos/UploadPOS';
 import OnlineSheetPOS from './pages/retail/pos/OnlineSheetPOS';
 import SalesHistory from './pages/retail/pos/SalesHistory';
@@ -40,7 +36,7 @@ function App() {
         >
           <Route path="/retail/dashboard" element={<DashboardRetail />} />
           <Route path="/retail/pos/traditional" element={<TraditionalPOS />} />
-          <Route path="/retail/pos/chatbot" element={<ChatbotPOS />} />
+          {/* ROTA PARA /chatbot REMOVIDA */}
           <Route path="/retail/pos/upload" element={<UploadPOS />} />
           <Route path="/retail/pos/online-sheet" element={<OnlineSheetPOS />} />
           <Route path="/retail/pos/sales-history" element={<SalesHistory />} />

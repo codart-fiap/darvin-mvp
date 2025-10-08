@@ -114,45 +114,6 @@ export const getClientsByRetailer = (retailerId) => {
     return clients.filter(c => c.retailerId === retailerId);
 } 
 
-// Conversor de texto para carrinho
-export const parseTextToCart = (text, inventory) => {
-    const cleanedText = text.toLowerCase().replace(/vendi/g, '').trim();
-    const parts = cleanedText.split(/ e |,| e,|, e/);
-    const cartItems = [];
-    const notFound = [];
-
-    parts.forEach(part => {
-        const trimmedPart = part.trim();
-        if (trimmedPart === '') return;
-        const match = trimmedPart.match(/^(\d+)\s+(.*)/);
-        let qty = 1;
-        let searchTerm = trimmedPart;
-        if (match) {
-            qty = parseInt(match[1], 10);
-            searchTerm = match[2].trim();
-        }
-        const foundProduct = inventory.find(item => 
-            item.nome.toLowerCase().includes(searchTerm) && item.totalStock > 0
-        );
-        if (foundProduct) {
-            const finalQty = Math.min(qty, foundProduct.totalStock);
-            const existingItem = cartItems.find(ci => ci.productId === foundProduct.productId);
-            if (existingItem) {
-                existingItem.qtde += finalQty;
-            } else {
-                cartItems.push({ 
-                    ...foundProduct, 
-                    qtde: finalQty, 
-                    precoUnit: foundProduct.avgPrice
-                });
-            }
-        } else {
-            notFound.push(trimmedPart);
-        }
-    });
-    return { items: cartItems, notFound: notFound };
-}
-
 
 // Monta os dados de Dashboard do Varejista
 export const getDashboardData = (retailerId, days = 30, categoryFilter = null, dateFilter = null) => {
@@ -319,8 +280,6 @@ export const getRetailerInsights = (retailerId) => {
 
     return insights;
 };
-
-// GET PRODUCT DETAILS FOI REMOVIDO DAQUI PORQUE A LÓGICA AGORA ESTÁ DENTRO DE getInventoryByRetailer
 
 // --- SELECTOR DE PROGRAMAS APRIMORADO ---
 export const getProgramsForRetailer = (retailerId) => {

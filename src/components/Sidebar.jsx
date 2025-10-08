@@ -1,6 +1,4 @@
 // --- ARQUIVO ATUALIZADO: src/components/Sidebar.jsx ---
-// --- TECNOLOGIA: React, JSX, JavaScript, React Router ---
-
 import React, { useState } from 'react';
 import { Nav, Collapse } from 'react-bootstrap';
 import { NavLink } from 'react-router-dom';
@@ -47,9 +45,9 @@ const Sidebar = () => {
       <Collapse in={vendasSubmenuOpen}>
         <div id="vendas-submenu" style={{ paddingLeft: '2rem' }}>
           <SidebarLink to="/retail/pos/traditional" icon={<CartFill />}>PDV Tradicional</SidebarLink>
-          <SidebarLink to="/retail/pos/online-sheet" icon={<FileEarmarkSpreadsheetFill />}>Planilha Online</SidebarLink>
+          {/* NOME E ÍCONE ATUALIZADOS */}
+          <SidebarLink to="/retail/pos/online-sheet" icon={<FileEarmarkSpreadsheetFill />}>Anota Aí</SidebarLink>
           <SidebarLink to="/retail/pos/upload" icon={<Upload />}>Upload de Planilha</SidebarLink>
-          {/* ROTA CORRIGIDA */}
           <SidebarLink to="/retail/pos/sales-history" icon={<ClockHistory />}>Histórico de Vendas</SidebarLink>
         </div>
       </Collapse>
