@@ -1,4 +1,4 @@
-// --- ARQUIVO ATUALIZADO E CORRIGIDO: src/components/Sidebar.jsx ---
+// --- ARQUIVO ATUALIZADO: src/components/Sidebar.jsx ---
 // --- TECNOLOGIA: React, JSX, JavaScript, React Router ---
 
 import React, { useState } from 'react';
@@ -11,11 +11,11 @@ import {
     AwardFill, 
     GearFill, 
     ChevronDown, 
-    ChatDotsFill, 
     Upload,
     LightbulbFill,
     FileEarmarkSpreadsheetFill,
-    BinocularsFill // <-- ÍCONE PARA O DARVIN VISION ADICIONADO
+    BinocularsFill,
+    ClockHistory
 } from 'react-bootstrap-icons';
 import { useAuth } from '../hooks/useAuth';
 
@@ -41,15 +41,15 @@ const Sidebar = () => {
         aria-controls="vendas-submenu"
         aria-expanded={vendasSubmenuOpen}
       >
-        <span><CartFill className="me-2" /> Registrar Venda</span>
+        <span><CartFill className="me-2" /> Vendas</span>
         <ChevronDown style={{ transform: vendasSubmenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
       </Nav.Link>
       <Collapse in={vendasSubmenuOpen}>
         <div id="vendas-submenu" style={{ paddingLeft: '2rem' }}>
           <SidebarLink to="/retail/pos/traditional" icon={<CartFill />}>PDV Tradicional</SidebarLink>
-          <SidebarLink to="/retail/pos/chatbot" icon={<ChatDotsFill />}>"Anota Aí"</SidebarLink>
-          <SidebarLink to="/retail/pos/upload" icon={<Upload />}>Upload de Planilha</SidebarLink>
           <SidebarLink to="/retail/pos/online-sheet" icon={<FileEarmarkSpreadsheetFill />}>Planilha Online</SidebarLink>
+          <SidebarLink to="/retail/pos/upload" icon={<Upload />}>Upload de Planilha</SidebarLink>
+          <SidebarLink to="/retail/sales-history" icon={<ClockHistory />}>Histórico de Vendas</SidebarLink>
         </div>
       </Collapse>
 
@@ -59,21 +59,16 @@ const Sidebar = () => {
     </>
   );
 
-  // --- ATUALIZAÇÃO APLICADA AQUI ---
-  // Uma função que retorna os links para a Indústria.
   const renderIndustryLinks = () => (
     <>
       <SidebarLink to="/industry/dashboard" icon={<HouseDoorFill />}>Dashboard</SidebarLink>
-      {/* O link para o Darvin Vision que faltava foi adicionado */}
       <SidebarLink to="/industry/vision" icon={<BinocularsFill />}>Darvin Vision</SidebarLink>
     </>
   );
 
-  // --- RENDERIZAÇÃO DO COMPONENTE ---
   return (
     <Nav as="nav" className="flex-column sidebar">
       <h4 className="sidebar-title mb-4">DARVIN</h4>
-      {/* Renderização condicional para os diferentes perfis */}
       {user?.role === 'retail' && renderRetailLinks()}
       {user?.role === 'industry' && renderIndustryLinks()}
     </Nav>

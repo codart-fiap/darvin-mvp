@@ -1,4 +1,4 @@
-// --- ARQUIVO ATUALIZADO E CORRIGIDO: src/App.jsx ---
+// --- ARQUIVO ATUALIZADO: src/App.jsx ---
 // --- TECNOLOGIA: React, JSX, JavaScript, React Router ---
 
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
@@ -14,6 +14,7 @@ import TraditionalPOS from './pages/retail/pos/TraditionalPOS';
 import ChatbotPOS from './pages/retail/pos/ChatbotPOS';
 import UploadPOS from './pages/retail/pos/UploadPOS';
 import OnlineSheetPOS from './pages/retail/pos/OnlineSheetPOS';
+import SalesHistory from './pages/retail/pos/SalesHistory';
 import Inventory from './pages/retail/Inventory';
 import Programs from './pages/retail/Programs';
 import SettingsRetail from './pages/retail/SettingsRetail';
@@ -42,6 +43,7 @@ function App() {
           <Route path="/retail/pos/chatbot" element={<ChatbotPOS />} />
           <Route path="/retail/pos/upload" element={<UploadPOS />} />
           <Route path="/retail/pos/online-sheet" element={<OnlineSheetPOS />} />
+          <Route path="/retail/pos/sales-history" element={<SalesHistory />} />
           <Route path="/retail/inventory" element={<Inventory />} />
           <Route path="/retail/programs" element={<Programs />} />
           <Route path="/retail/settings" element={<SettingsRetail />} />
@@ -56,7 +58,6 @@ function App() {
             </ProtectedRoute>
           }
         >
-          {/* Ambas as rotas da indústria devem estar aqui dentro */}
           <Route path="/industry/dashboard" element={<DashboardIndustry />} />
           <Route path="/industry/vision" element={<DarvinVision />} />
         </Route>
