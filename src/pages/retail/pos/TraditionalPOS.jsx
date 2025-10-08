@@ -1,5 +1,5 @@
-// --- ARQUIVO ATUALIZADO: src/pages/retail/pos/TraditionalPOS.jsx ---
-import React, { useState, useMemo } from 'react';
+// --- ARQUIVO ATUALIZADO E CORRIGIDO: src/pages/retail/pos/TraditionalPOS.jsx ---
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import { getInventoryByRetailer, getClientsByRetailer } from '../../../state/selectors';
 import { setItem, getItem } from '../../../state/storage';
@@ -16,16 +16,18 @@ const TraditionalPOS = () => {
   const [paymentMethod, setPaymentMethod] = useState('Dinheiro');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [lastUpdated, setLastUpdated] = useState(Date.now());
 
-  // Estados para o modal de novo cliente
   const [showNewClientModal, setShowNewClientModal] = useState(false);
   const [newClient, setNewClient] = useState({ nome: '', sexo: 'Prefiro não informar', idade: '' });
   const [clientList, setClientList] = useState(() => user ? getClientsByRetailer(user.actorId) : []);
 
-  const inventory = useMemo(() => user ? getInventoryByRetailer(user.actorId) : [], [user]);
+  // Recarrega o inventário quando uma venda é finalizada
+  const inventory = useMemo(() => user ? getInventoryByRetailer(user.actorId) : [], [user, lastUpdated]);
   
   const searchResults = useMemo(() => {
-    const itemsInStock = inventory.filter(item => item.estoque > 0);
+    // CORREÇÃO: Usar 'totalStock' em vez de 'estoque' para o objeto agrupado
+    const itemsInStock = inventory.filter(item => item.totalStock > 0);
     if (!searchTerm) return itemsInStock;
     return itemsInStock.filter(item => 
       item.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -36,19 +38,22 @@ const TraditionalPOS = () => {
   const addToCart = (product) => {
     const existingItem = cart.find(item => item.productId === product.productId);
     if (existingItem) {
-      if (existingItem.qtde < product.estoque) {
+      // CORREÇÃO: Verificar contra 'totalStock'
+      if (existingItem.qtde < product.totalStock) {
         setCart(cart.map(item => item.productId === product.productId ? { ...item, qtde: item.qtde + 1 } : item));
       } else {
         setError(`Estoque máximo para "${product.nome}" atingido.`);
         setTimeout(() => setError(''), 3000);
       }
     } else {
-      setCart([...cart, { ...product, qtde: 1, precoUnit: product.precoVenda }]);
+      // CORREÇÃO: Usar 'avgPrice' que agora vem do seletor otimizado
+      setCart([...cart, { ...product, qtde: 1, precoUnit: product.avgPrice }]);
     }
   };
   
   const cartTotal = cart.reduce((total, item) => total + (item.precoUnit * item.qtde), 0);
 
+  // --- LÓGICA DE VENDA APRIMORADA (FEFO - First Expired, First Out) ---
   const handleFinalizeSale = () => {
     if (cart.length === 0) { setError('O carrinho está vazio.'); return; }
     if (!selectedClient) { setError('Por favor, selecione um cliente.'); return; }
@@ -58,19 +63,30 @@ const TraditionalPOS = () => {
       itens: cart.map(item => ({ productId: item.productId, sku: item.sku, qtde: item.qtde, precoUnit: item.precoUnit })),
       totalBruto: cartTotal, desconto: 0, totalLiquido: cartTotal, formaPagamento: paymentMethod,
     };
+    
+    // Lógica de baixa de estoque por lote (FEFO)
+    let currentInventory = getItem('inventory') || [];
+    for (const cartItem of cart) {
+        let quantityToDeduct = cartItem.qtde;
+
+        // Encontra todos os lotes do produto com estoque, ordenados por data de validade
+        const productBatches = currentInventory
+            .filter(inv => inv.productId === cartItem.productId && inv.estoque > 0)
+            .sort((a, b) => new Date(a.dataValidade) - new Date(b.dataValidade));
+
+        // Deduz a quantidade do(s) lote(s) mais antigo(s)
+        for (const batch of productBatches) {
+            if (quantityToDeduct === 0) break;
+
+            const deductAmount = Math.min(quantityToDeduct, batch.estoque);
+            batch.estoque -= deductAmount;
+            quantityToDeduct -= deductAmount;
+        }
+    }
+    setItem('inventory', currentInventory); // Salva o inventário atualizado
 
     const allSales = getItem('sales') || [];
     setItem('sales', [...allSales, newSale]);
-
-    const currentInventory = getItem('inventory') || [];
-    const updatedInventory = currentInventory.map(invItem => {
-      const cartItem = cart.find(c => c.productId === invItem.productId);
-      if (cartItem) {
-        return { ...invItem, estoque: invItem.estoque - cartItem.qtde };
-      }
-      return invItem;
-    });
-    setItem('inventory', updatedInventory);
 
     setSuccess(`Venda finalizada com sucesso!`);
     setTimeout(() => setSuccess(''), 3000);
@@ -78,26 +94,24 @@ const TraditionalPOS = () => {
     setSearchTerm('');
     setSelectedClient('');
     setError('');
+    setLastUpdated(Date.now()); // Força a atualização do inventário na tela
   };
 
   const handleSaveNewClient = () => {
       if (!newClient.nome || !newClient.idade) {
-          // Adicionar validação se necessário
           return;
       }
       const allClients = getItem('clients') || [];
       const clientData = {
-          id: generateId(),
-          retailerId: user.actorId,
-          ...newClient,
-          idade: Number(newClient.idade),
-          habitoCompra: 'Ocasional' // Padrão
+          id: generateId(), retailerId: user.actorId, ...newClient,
+          idade: Number(newClient.idade), habitoCompra: 'Ocasional'
       };
 
       const updatedClients = [...allClients, clientData];
       setItem('clients', updatedClients);
-      setClientList(updatedClients.filter(c => c.retailerId === user.actorId));
-      setSelectedClient(clientData.id); // Seleciona o novo cliente
+      const retailerClients = updatedClients.filter(c => c.retailerId === user.actorId);
+      setClientList(retailerClients);
+      setSelectedClient(clientData.id);
       setShowNewClientModal(false);
       setNewClient({ nome: '', sexo: 'Prefiro não informar', idade: '' });
   };
@@ -123,7 +137,7 @@ const TraditionalPOS = () => {
                 
                 <Row style={{ height: 'calc(100vh - 180px)', overflowY: 'auto' }}>
                     {searchResults.map(item => (
-                        <Col xl={3} lg={4} md={6} key={item.id} className="mb-3">
+                        <Col xl={3} lg={4} md={6} key={item.productId} className="mb-3">
                             <Card className="product-card h-100" onClick={() => addToCart(item)}>
                                 <Card.Img 
                                     variant="top" 
@@ -135,11 +149,13 @@ const TraditionalPOS = () => {
                                     <Card.Text className="text-muted mb-1"><small>{item.marca}</small></Card.Text>
                                     <Card.Title as="h6" className="mb-1" style={{ fontSize: '0.9rem', flexGrow: 1 }}>{item.nome}</Card.Title>
                                     <Card.Text className="mb-0">
-                                        <small>Estoque: {item.estoque}</small>
+                                        {/* CORREÇÃO: Exibir 'totalStock' */}
+                                        <small>Estoque: {item.totalStock}</small>
                                     </Card.Text>
                                 </Card.Body>
                                 <Card.Footer>
-                                    <strong>R$ {item.precoVenda.toFixed(2)}</strong>
+                                    {/* CORREÇÃO: Exibir 'avgPrice' */}
+                                    <strong>R$ {item.avgPrice.toFixed(2)}</strong>
                                 </Card.Footer>
                             </Card>
                         </Col>

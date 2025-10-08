@@ -36,24 +36,55 @@ const SalesHistory = () => {
           origin = 'PLANILHA';
         }
 
-        // Calcula totais
+        // Calcula totais CORRETAMENTE
         const totalItems = sale.itens.reduce((sum, item) => sum + item.qtde, 0);
-        const margin = sale.totalBruto > 0 
-          ? ((sale.totalLiquido / sale.totalBruto) * 100).toFixed(1)
+        
+        // Usa os valores já calculados na venda
+        const totalBruto = sale.totalBruto;
+        const desconto = sale.desconto || 0;
+        const totalLiquido = sale.totalLiquido;
+        
+        // Calcula o CUSTO total da venda (busca custo médio no inventário)
+        let totalCost = 0;
+        sale.itens.forEach(item => {
+          const invItem = inventory.find(i => 
+            i.productId === item.productId && 
+            i.retailerId === user.actorId
+          );
+          if (invItem && invItem.custoMedio) {
+            totalCost += invItem.custoMedio * item.qtde;
+          }
+        });
+        
+        // Calcula LUCRO e % de LUCRO
+        const profit = totalLiquido - totalCost;
+        const profitPercentage = totalLiquido > 0 
+          ? ((profit / totalLiquido) * 100).toFixed(1)
           : 0;
 
         return {
           ...sale,
           origin,
           totalItems,
-          margin,
-          formattedDate: new Date(sale.dataISO).toLocaleString('pt-BR')
+          totalBruto,
+          desconto,
+          totalLiquido,
+          totalCost,
+          profit,
+          profitPercentage,
+          formattedDate: new Date(sale.dataISO).toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
         };
       })
       .sort((a, b) => new Date(b.dataISO) - new Date(a.dataISO));
     
     return filtered;
-  }, [user, allSales]);
+  }, [user, allSales, inventory]);
 
   // Aplica filtros
   const filteredSales = useMemo(() => {
@@ -76,14 +107,16 @@ const SalesHistory = () => {
     });
   }, [retailerSales, searchTerm, originFilter, dateRange]);
 
-  // Calcula estatísticas
+  // Calcula estatísticas CORRETAMENTE
   const totalStats = useMemo(() => {
     return filteredSales.reduce((acc, sale) => ({
+      count: acc.count + 1,
       gross: acc.gross + sale.totalBruto,
       discount: acc.discount + sale.desconto,
       net: acc.net + sale.totalLiquido,
-      items: acc.items + sale.totalItems
-    }), { gross: 0, discount: 0, net: 0, items: 0 });
+      items: acc.items + sale.totalItems,
+      profit: acc.profit + sale.profit
+    }), { count: 0, gross: 0, discount: 0, net: 0, items: 0, profit: 0 });
   }, [filteredSales]);
 
   // Prepara detalhes da venda selecionada
@@ -132,7 +165,7 @@ const SalesHistory = () => {
               <div className="d-flex justify-content-between align-items-center">
                 <div>
                   <p className="text-muted mb-1 small">Total de Vendas</p>
-                  <h4 className="mb-0">{filteredSales.length}</h4>
+                  <h4 className="mb-0">{totalStats.count}</h4>
                 </div>
                 <div className="bg-primary bg-opacity-10 p-3 rounded">
                   <i className="bi bi-cart-check fs-4 text-primary"></i>
@@ -164,8 +197,8 @@ const SalesHistory = () => {
                   <p className="text-muted mb-1 small">Receita Líquida</p>
                   <h4 className="mb-0 text-success">R$ {totalStats.net.toFixed(2)}</h4>
                 </div>
-                <div className="bg-info bg-opacity-10 p-3 rounded">
-                  <i className="bi bi-graph-up-arrow fs-4 text-info"></i>
+                <div className="bg-success bg-opacity-10 p-3 rounded">
+                  <i className="bi bi-cash-stack fs-4 text-success"></i>
                 </div>
               </div>
             </Card.Body>
@@ -176,11 +209,11 @@ const SalesHistory = () => {
             <Card.Body>
               <div className="d-flex justify-content-between align-items-center">
                 <div>
-                  <p className="text-muted mb-1 small">Total de Itens</p>
-                  <h4 className="mb-0">{totalStats.items}</h4>
+                  <p className="text-muted mb-1 small">Lucro Total</p>
+                  <h4 className="mb-0 text-primary">R$ {totalStats.profit.toFixed(2)}</h4>
                 </div>
-                <div className="bg-warning bg-opacity-10 p-3 rounded">
-                  <i className="bi bi-box-seam fs-4 text-warning"></i>
+                <div className="bg-primary bg-opacity-10 p-3 rounded">
+                  <i className="bi bi-piggy-bank fs-4 text-primary"></i>
                 </div>
               </div>
             </Card.Body>
@@ -248,9 +281,9 @@ const SalesHistory = () => {
                   <th className="border-0 py-3">Código</th>
                   <th className="border-0 py-3">Origem</th>
                   <th className="border-0 py-3 text-center">Itens</th>
-                  <th className="border-0 py-3 text-end">Valor Bruto</th>
-                  <th className="border-0 py-3 text-end">Desconto</th>
-                  <th className="border-0 py-3 text-end">Margem</th>
+                  <th className="border-0 py-3 text-end">Valor Total</th>
+                  <th className="border-0 py-3 text-end">% Lucro</th>
+                  <th className="border-0 py-3 text-end">Valor Lucro</th>
                   <th className="border-0 py-3 text-center">Ações</th>
                 </tr>
               </thead>
@@ -279,13 +312,20 @@ const SalesHistory = () => {
                       <strong>{sale.totalItems}</strong>
                     </td>
                     <td className="align-middle text-end">
-                      <strong>R$ {sale.totalBruto.toFixed(2)}</strong>
-                    </td>
-                    <td className="align-middle text-end text-success">
-                      R$ {sale.desconto.toFixed(2)}
+                      <strong>R$ {sale.totalLiquido.toFixed(2)}</strong>
                     </td>
                     <td className="align-middle text-end">
-                      <span className="text-muted">{sale.margin}%</span>
+                      <Badge 
+                        bg={sale.profitPercentage >= 20 ? 'success' : sale.profitPercentage >= 10 ? 'warning' : 'danger'}
+                        className="px-2 py-1"
+                      >
+                        {sale.profitPercentage}%
+                      </Badge>
+                    </td>
+                    <td className="align-middle text-end">
+                      <strong className={sale.profit > 0 ? 'text-success' : 'text-danger'}>
+                        R$ {sale.profit.toFixed(2)}
+                      </strong>
                     </td>
                     <td className="align-middle text-center">
                       <Button 
@@ -386,12 +426,12 @@ const SalesHistory = () => {
                   </div>
                   <div className="d-flex justify-content-between mb-3">
                     <span className="text-muted">Desconto:</span>
-                    <strong className="text-success">- R$ {saleDetails.desconto.toFixed(2)}</strong>
+                    <strong className="text-danger">- R$ {saleDetails.desconto.toFixed(2)}</strong>
                   </div>
                   <hr />
                   <div className="d-flex justify-content-between">
                     <strong>Valor Líquido:</strong>
-                    <h5 className="text-primary mb-0">R$ {saleDetails.totalLiquido.toFixed(2)}</h5>
+                    <h5 className="text-success mb-0">R$ {saleDetails.totalLiquido.toFixed(2)}</h5>
                   </div>
                 </Card.Body>
               </Card>
@@ -419,6 +459,16 @@ const SalesHistory = () => {
                     </tr>
                   ))}
                 </tbody>
+                <tfoot className="bg-light">
+                  <tr>
+                    <td colSpan="3" className="text-end"><strong>Total:</strong></td>
+                    <td className="text-end">
+                      <strong className="text-success">
+                        R$ {saleDetails.items.reduce((sum, i) => sum + i.subtotal, 0).toFixed(2)}
+                      </strong>
+                    </td>
+                  </tr>
+                </tfoot>
               </Table>
             </>
           )}
