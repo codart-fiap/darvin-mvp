@@ -1,9 +1,9 @@
 // FILE: src/pages/retail/pos/SalesHistory.jsx
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import { getItem } from '../../../state/storage';
-import { Container, Row, Col, Card, Table, Badge, Button, Form, InputGroup, Modal, Spinner } from 'react-bootstrap';
-import { Search, Eye, Calendar, X } from 'react-bootstrap-icons';
+import { Container, Row, Col, Card, Table, Badge, Button, Form, InputGroup, Modal } from 'react-bootstrap';
+import { Search, Eye, Calendar } from 'react-bootstrap-icons';
 
 const SalesHistory = () => {
   const { user } = useAuth();
@@ -12,15 +12,6 @@ const SalesHistory = () => {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [selectedSale, setSelectedSale] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  // Debug: verifica se o usuário está carregado
-  useEffect(() => {
-    console.log('SalesHistory - User:', user);
-    if (user) {
-      setLoading(false);
-    }
-  }, [user]);
 
   // Busca dados reais do localStorage
   const allSales = getItem('sales') || [];
@@ -31,12 +22,8 @@ const SalesHistory = () => {
   // Filtra vendas do varejista atual
   const retailerSales = useMemo(() => {
     if (!user || !user.actorId) {
-      console.log('SalesHistory - Sem usuário ou actorId');
       return [];
     }
-    
-    console.log('SalesHistory - Filtrando vendas para retailerId:', user.actorId);
-    console.log('SalesHistory - Total de vendas no sistema:', allSales.length);
     
     const filtered = allSales
       .filter(sale => sale.retailerId === user.actorId)
@@ -65,7 +52,6 @@ const SalesHistory = () => {
       })
       .sort((a, b) => new Date(b.dataISO) - new Date(a.dataISO));
     
-    console.log('SalesHistory - Vendas filtradas:', filtered.length);
     return filtered;
   }, [user, allSales]);
 
@@ -127,30 +113,6 @@ const SalesHistory = () => {
     setSelectedSale(sale);
     setShowModal(true);
   };
-
-  // Mostra loading enquanto verifica o usuário
-  if (loading) {
-    return (
-      <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
-        <div className="text-center">
-          <Spinner animation="border" variant="primary" />
-          <p className="mt-3 text-muted">Carregando histórico...</p>
-        </div>
-      </Container>
-    );
-  }
-
-  // Se não tem usuário após o loading, mostra mensagem
-  if (!user) {
-    return (
-      <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
-        <div className="text-center">
-          <i className="bi bi-exclamation-triangle display-1 text-warning"></i>
-          <p className="mt-3 text-muted">Usuário não encontrado. Por favor, faça login novamente.</p>
-        </div>
-      </Container>
-    );
-  }
 
   return (
     <Container fluid className="p-4">

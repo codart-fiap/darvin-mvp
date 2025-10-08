@@ -49,7 +49,8 @@ const Sidebar = () => {
           <SidebarLink to="/retail/pos/traditional" icon={<CartFill />}>PDV Tradicional</SidebarLink>
           <SidebarLink to="/retail/pos/online-sheet" icon={<FileEarmarkSpreadsheetFill />}>Planilha Online</SidebarLink>
           <SidebarLink to="/retail/pos/upload" icon={<Upload />}>Upload de Planilha</SidebarLink>
-          <SidebarLink to="/retail/sales-history" icon={<ClockHistory />}>Histórico de Vendas</SidebarLink>
+          {/* ROTA CORRIGIDA */}
+          <SidebarLink to="/retail/pos/sales-history" icon={<ClockHistory />}>Histórico de Vendas</SidebarLink>
         </div>
       </Collapse>
 
