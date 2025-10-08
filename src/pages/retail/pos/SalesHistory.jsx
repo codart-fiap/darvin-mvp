@@ -1,14 +1,14 @@
 // FILE: src/pages/retail/pos/SalesHistory.jsx
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
-import { getItem } from '../../../state/storage';
+import { getItem, setItem } from '../../../state/storage';
 import { 
     Container, Row, Col, Card, Table, Button, Form, 
     Badge, Modal, Alert, ButtonGroup, InputGroup 
 } from 'react-bootstrap';
 import { 
     Calendar, Search, FileArrowDown, Eye,
-    FunnelFill, XCircle 
+    FunnelFill, XCircle, Trash, CheckSquare, Square
 } from 'react-bootstrap-icons';
 
 const SalesHistory = () => {
@@ -16,18 +16,19 @@ const SalesHistory = () => {
     const [sales, setSales] = useState([]);
     const [selectedSale, setSelectedSale] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [selectedSales, setSelectedSales] = useState(new Set());
     
     // Filtros
     const [filters, setFilters] = useState({
         startDate: '',
         endDate: '',
-        source: 'all', // 'all', 'native', 'imported'
+        source: 'all',
         searchTerm: '',
         minValue: '',
         maxValue: ''
     });
 
-    // Carrega vendas do localStorage
     useEffect(() => {
         if (user) {
             loadSales();
@@ -43,6 +44,7 @@ const SalesHistory = () => {
                 .sort((a, b) => new Date(b.dataHora) - new Date(a.dataHora));
             
             setSales(retailerSales);
+            setSelectedSales(new Set()); // Limpa seleções ao recarregar
         } catch (error) {
             console.error('Erro ao carregar vendas:', error);
         }
@@ -82,7 +84,7 @@ const SalesHistory = () => {
         };
     };
 
-    // Filtra vendas
+    // Filtrar vendas
     const filteredSales = useMemo(() => {
         return sales.filter(sale => {
             if (filters.startDate) {
@@ -128,6 +130,50 @@ const SalesHistory = () => {
         };
     }, [filteredSales]);
 
+    // Funções de seleção
+    const toggleSelectSale = (saleId) => {
+        const newSelected = new Set(selectedSales);
+        if (newSelected.has(saleId)) {
+            newSelected.delete(saleId);
+        } else {
+            newSelected.add(saleId);
+        }
+        setSelectedSales(newSelected);
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedSales.size === filteredSales.length) {
+            setSelectedSales(new Set());
+        } else {
+            setSelectedSales(new Set(filteredSales.map(s => s.id)));
+        }
+    };
+
+    const isAllSelected = selectedSales.size > 0 && selectedSales.size === filteredSales.length;
+    const isSomeSelected = selectedSales.size > 0 && selectedSales.size < filteredSales.length;
+
+    // Função de exclusão
+    const handleDeleteSelected = () => {
+        if (selectedSales.size === 0) return;
+        setShowDeleteModal(true);
+    };
+
+    const confirmDelete = () => {
+        try {
+            const allSales = getItem('sales') || [];
+            const updatedSales = allSales.filter(sale => !selectedSales.has(sale.id));
+            setItem('sales', updatedSales);
+            
+            setShowDeleteModal(false);
+            loadSales();
+            
+            alert(`${selectedSales.size} venda(s) excluída(s) com sucesso!`);
+        } catch (error) {
+            console.error('Erro ao excluir vendas:', error);
+            alert('Erro ao excluir vendas. Tente novamente.');
+        }
+    };
+
     const handleViewDetails = (sale) => {
         setSelectedSale(sale);
         setShowDetailModal(true);
@@ -155,6 +201,16 @@ const SalesHistory = () => {
                     <h1 className="h3 mb-1">Histórico de Vendas</h1>
                     <p className="text-muted mb-0">Visualize e analise todas as transações realizadas</p>
                 </div>
+                {selectedSales.size > 0 && (
+                    <Button 
+                        variant="danger" 
+                        onClick={handleDeleteSelected}
+                        className="d-flex align-items-center"
+                    >
+                        <Trash className="me-2" />
+                        Excluir ({selectedSales.size})
+                    </Button>
+                )}
             </div>
 
             {/* KPIs */}
@@ -305,6 +361,16 @@ const SalesHistory = () => {
                         <Table hover responsive className="mb-0 align-middle">
                             <thead style={{ position: 'sticky', top: 0, backgroundColor: '#fff', zIndex: 1 }}>
                                 <tr>
+                                    <th style={{ width: '50px' }}>
+                                        <Form.Check
+                                            type="checkbox"
+                                            checked={isAllSelected}
+                                            ref={input => {
+                                                if (input) input.indeterminate = isSomeSelected;
+                                            }}
+                                            onChange={toggleSelectAll}
+                                        />
+                                    </th>
                                     <th>Data/Hora</th>
                                     <th>ID Transação</th>
                                     <th>Origem</th>
@@ -318,13 +384,23 @@ const SalesHistory = () => {
                             <tbody>
                                 {filteredSales.length === 0 ? (
                                     <tr>
-                                        <td colSpan="8" className="text-center text-muted py-4">
+                                        <td colSpan="9" className="text-center text-muted py-4">
                                             Nenhuma venda encontrada com os filtros aplicados
                                         </td>
                                     </tr>
                                 ) : (
                                     filteredSales.map(sale => (
-                                        <tr key={sale.id}>
+                                        <tr 
+                                            key={sale.id}
+                                            className={selectedSales.has(sale.id) ? 'table-active' : ''}
+                                        >
+                                            <td>
+                                                <Form.Check
+                                                    type="checkbox"
+                                                    checked={selectedSales.has(sale.id)}
+                                                    onChange={() => toggleSelectSale(sale.id)}
+                                                />
+                                            </td>
                                             <td>
                                                 <small>
                                                     {new Date(sale.dataHora).toLocaleDateString('pt-BR')}<br/>
@@ -413,9 +489,33 @@ const SalesHistory = () => {
                     </Button>
                 </Modal.Footer>
             </Modal>
+
+            {/* Modal de Confirmação de Exclusão */}
+            <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>Confirmar Exclusão</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Alert variant="warning" className="mb-3">
+                        <strong>⚠️ Atenção!</strong> Esta ação não pode ser desfeita.
+                    </Alert>
+                    <p>
+                        Você está prestes a excluir <strong>{selectedSales.size}</strong> venda(s).
+                        Tem certeza que deseja continuar?
+                    </p>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+                        Cancelar
+                    </Button>
+                    <Button variant="danger" onClick={confirmDelete}>
+                        <Trash className="me-2" />
+                        Sim, Excluir
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </Container>
     );
 };
 
 export default SalesHistory;
-

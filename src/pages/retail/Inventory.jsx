@@ -1,252 +1,668 @@
 // FILE: src/pages/retail/Inventory.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getInventoryByRetailer } from '../../state/selectors';
 import { getItem, setItem } from '../../state/storage';
-import { Container, Table, Button, Modal, Form, Row, Col, Card, Badge, Alert } from 'react-bootstrap';
+import { generateId } from '../../utils/ids';
+import { 
+    Container, Row, Col, Card, Table, Button, Form, 
+    Modal, Alert, Badge, InputGroup, OverlayTrigger, Tooltip 
+} from 'react-bootstrap';
+import { 
+    Search, Plus, PencilSquare, Trash, 
+    BoxSeam, ExclamationTriangle, CheckCircle,
+    FunnelFill, XCircle
+} from 'react-bootstrap-icons';
 
 const Inventory = () => {
-  const { user } = useAuth();
+    const { user } = useAuth();
+    const [inventory, setInventory] = useState([]);
+    const [showModal, setShowModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [modalMode, setModalMode] = useState('create'); // 'create' ou 'edit'
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('all');
+    const [stockFilter, setStockFilter] = useState('all');
+    
+    const [formData, setFormData] = useState({
+        nome: '',
+        sku: '',
+        categoria: 'Alimentos',
+        marca: '',
+        estoque: 0,
+        custoMedio: 0,
+        precoVenda: 0,
+        dataValidade: ''
+    });
 
-  const [inventoryItems, setInventoryItems] = useState([]);
-  const [showModal, setShowModal] = useState(false);
-  const [currentItem, setCurrentItem] = useState(null);
-  const [modalType, setModalType] = useState('entrada');
-  const [adjustmentValue, setAdjustmentValue] = useState(0);
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [error, setError] = useState(null);
+    const [formErrors, setFormErrors] = useState({});
 
-  useEffect(() => {
-    if (user) {
-      try {
-        console.log('Carregando inventário para:', user.actorId);
-        const items = getInventoryByRetailer(user.actorId);
-        console.log('Itens carregados:', items);
-        setInventoryItems(items);
-      } catch (err) {
-        console.error('ERRO ao carregar inventário:', err);
-        setError(err.message);
-      }
-    }
-  }, [user]);
-
-  const filteredItems = useMemo(() => {
-    try {
-      return inventoryItems.filter(item => {
-        const categoryMatch = categoryFilter === 'all' || item.categoria === categoryFilter;
-        return categoryMatch;
-      });
-    } catch (err) {
-      console.error('ERRO ao filtrar items:', err);
-      return [];
-    }
-  }, [inventoryItems, categoryFilter]);
-
-  const uniqueCategories = useMemo(() => {
-    try {
-      return [...new Set(inventoryItems.map(item => item.categoria || 'Diversos'))].sort();
-    } catch (err) {
-      console.error('ERRO ao extrair categorias:', err);
-      return ['Diversos'];
-    }
-  }, [inventoryItems]);
-
-  const handleOpenModal = (item, type) => {
-    setCurrentItem(item);
-    setModalType(type);
-    setShowModal(true);
-    setAdjustmentValue(type === 'ajuste' ? item.estoque : 0);
-  };
-
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setCurrentItem(null);
-  };
-
-  const handleUpdateStock = () => {
-    if (!currentItem) return;
-
-    try {
-      const allInventory = getItem('inventory') || [];
-      const updatedInventory = allInventory.map(invItem => {
-        if (invItem.id === currentItem.id) {
-          const currentValue = invItem.estoque;
-          const newValue = parseInt(adjustmentValue, 10);
-
-          if (modalType === 'entrada') {
-            return { ...invItem, estoque: currentValue + newValue };
-          } else {
-            return { ...invItem, estoque: newValue };
-          }
+    useEffect(() => {
+        if (user) {
+            loadInventory();
         }
-        return invItem;
-      });
+    }, [user]);
 
-      setItem('inventory', updatedInventory);
-      setInventoryItems(getInventoryByRetailer(user.actorId));
-      handleCloseModal();
-    } catch (err) {
-      console.error('ERRO ao atualizar estoque:', err);
-      alert('Erro ao atualizar estoque: ' + err.message);
+    const loadInventory = () => {
+        const data = getInventoryByRetailer(user.actorId);
+        setInventory(data);
+    };
+
+    // Filtros e busca
+    const filteredInventory = useMemo(() => {
+        return inventory.filter(item => {
+            const matchesSearch = !searchTerm || 
+                item.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.marca.toLowerCase().includes(searchTerm.toLowerCase());
+            
+            const matchesCategory = categoryFilter === 'all' || item.categoria === categoryFilter;
+            
+            let matchesStock = true;
+            if (stockFilter === 'low') matchesStock = item.estoque > 0 && item.estoque <= 10;
+            else if (stockFilter === 'out') matchesStock = item.estoque === 0;
+            else if (stockFilter === 'ok') matchesStock = item.estoque > 10;
+            
+            return matchesSearch && matchesCategory && matchesStock;
+        });
+    }, [inventory, searchTerm, categoryFilter, stockFilter]);
+
+    // Estatísticas
+    const stats = useMemo(() => {
+        const totalProducts = inventory.length;
+        const totalValue = inventory.reduce((sum, item) => sum + (item.precoVenda * item.estoque), 0);
+        const totalCost = inventory.reduce((sum, item) => sum + (item.custoMedio * item.estoque), 0);
+        const lowStock = inventory.filter(item => item.estoque > 0 && item.estoque <= 10).length;
+        const outOfStock = inventory.filter(item => item.estoque === 0).length;
+
+        return { totalProducts, totalValue, totalCost, lowStock, outOfStock };
+    }, [inventory]);
+
+    // Categorias únicas
+    const categories = useMemo(() => {
+        return [...new Set(inventory.map(item => item.categoria))].sort();
+    }, [inventory]);
+
+    // Abrir modal para criar
+    const handleCreate = () => {
+        setModalMode('create');
+        setFormData({
+            nome: '',
+            sku: `SKU-${Date.now()}`,
+            categoria: 'Alimentos',
+            marca: '',
+            estoque: 0,
+            custoMedio: 0,
+            precoVenda: 0,
+            dataValidade: ''
+        });
+        setFormErrors({});
+        setShowModal(true);
+    };
+
+    // Abrir modal para editar
+    const handleEdit = (item) => {
+        setModalMode('edit');
+        setSelectedItem(item);
+        setFormData({
+            nome: item.nome,
+            sku: item.sku,
+            categoria: item.categoria,
+            marca: item.marca,
+            estoque: item.estoque,
+            custoMedio: item.custoMedio,
+            precoVenda: item.precoVenda,
+            dataValidade: item.dataValidade ? item.dataValidade.split('T')[0] : ''
+        });
+        setFormErrors({});
+        setShowModal(true);
+    };
+
+    // Validação do formulário
+    const validateForm = () => {
+        const errors = {};
+        
+        if (!formData.nome.trim()) errors.nome = 'Nome é obrigatório';
+        if (!formData.sku.trim()) errors.sku = 'SKU é obrigatório';
+        if (!formData.marca.trim()) errors.marca = 'Marca é obrigatória';
+        if (formData.estoque < 0) errors.estoque = 'Estoque não pode ser negativo';
+        if (formData.custoMedio < 0) errors.custoMedio = 'Custo não pode ser negativo';
+        if (formData.precoVenda <= 0) errors.precoVenda = 'Preço de venda deve ser maior que zero';
+        
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
+    // Salvar (criar ou editar)
+    const handleSave = () => {
+        if (!validateForm()) return;
+
+        try {
+            const allProducts = getItem('products') || [];
+            const allInventory = getItem('inventory') || [];
+
+            if (modalMode === 'create') {
+                // Criar novo produto
+                const productId = generateId();
+                
+                const newProduct = {
+                    id: productId,
+                    sku: formData.sku,
+                    nome: formData.nome,
+                    categoria: formData.categoria,
+                    subcategoria: formData.categoria,
+                    industryId: 'generic',
+                    precoSugerido: parseFloat(formData.precoVenda),
+                    supplierIds: [],
+                    marca: formData.marca
+                };
+                
+                const validade = formData.dataValidade 
+                    ? new Date(formData.dataValidade).toISOString()
+                    : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+                
+                const newInventoryItem = {
+                    id: generateId(),
+                    retailerId: user.actorId,
+                    productId: productId,
+                    nome: formData.nome,
+                    sku: formData.sku,
+                    categoria: formData.categoria,
+                    marca: formData.marca,
+                    estoque: parseInt(formData.estoque),
+                    custoMedio: parseFloat(formData.custoMedio),
+                    precoVenda: parseFloat(formData.precoVenda),
+                    precoSugerido: parseFloat(formData.precoVenda),
+                    dataValidade: validade
+                };
+                
+                setItem('products', [...allProducts, newProduct]);
+                setItem('inventory', [...allInventory, newInventoryItem]);
+                
+            } else {
+                // Editar produto existente
+                const updatedProducts = allProducts.map(p => 
+                    p.id === selectedItem.productId 
+                        ? { ...p, nome: formData.nome, sku: formData.sku, marca: formData.marca, categoria: formData.categoria, precoSugerido: parseFloat(formData.precoVenda) }
+                        : p
+                );
+                
+                const validade = formData.dataValidade 
+                    ? new Date(formData.dataValidade).toISOString()
+                    : selectedItem.dataValidade;
+                
+                const updatedInventory = allInventory.map(inv => 
+                    inv.id === selectedItem.id
+                        ? {
+                            ...inv,
+                            nome: formData.nome,
+                            sku: formData.sku,
+                            categoria: formData.categoria,
+                            marca: formData.marca,
+                            estoque: parseInt(formData.estoque),
+                            custoMedio: parseFloat(formData.custoMedio),
+                            precoVenda: parseFloat(formData.precoVenda),
+                            precoSugerido: parseFloat(formData.precoVenda),
+                            dataValidade: validade
+                        }
+                        : inv
+                );
+                
+                setItem('products', updatedProducts);
+                setItem('inventory', updatedInventory);
+            }
+            
+            setShowModal(false);
+            loadInventory();
+            
+            const message = modalMode === 'create' 
+                ? 'Produto cadastrado com sucesso!' 
+                : 'Produto atualizado com sucesso!';
+            alert(message);
+            
+        } catch (error) {
+            console.error('Erro ao salvar produto:', error);
+            alert('Erro ao salvar produto. Tente novamente.');
+        }
+    };
+
+    // Abrir modal de exclusão
+    const handleDelete = (item) => {
+        setSelectedItem(item);
+        setShowDeleteModal(true);
+    };
+
+    // Confirmar exclusão
+    const confirmDelete = () => {
+        try {
+            const allProducts = getItem('products') || [];
+            const allInventory = getItem('inventory') || [];
+            
+            const updatedProducts = allProducts.filter(p => p.id !== selectedItem.productId);
+            const updatedInventory = allInventory.filter(inv => inv.id !== selectedItem.id);
+            
+            setItem('products', updatedProducts);
+            setItem('inventory', updatedInventory);
+            
+            setShowDeleteModal(false);
+            loadInventory();
+            alert('Produto excluído com sucesso!');
+            
+        } catch (error) {
+            console.error('Erro ao excluir produto:', error);
+            alert('Erro ao excluir produto. Tente novamente.');
+        }
+    };
+
+    // Calcular margem de lucro
+    const calculateMargin = () => {
+        const custo = parseFloat(formData.custoMedio) || 0;
+        const preco = parseFloat(formData.precoVenda) || 0;
+        if (custo === 0) return 0;
+        return (((preco - custo) / custo) * 100).toFixed(2);
+    };
+
+    // Status do estoque
+    const getStockStatus = (stock) => {
+        if (stock === 0) return { variant: 'danger', text: 'Sem estoque', icon: <ExclamationTriangle /> };
+        if (stock <= 10) return { variant: 'warning', text: 'Estoque baixo', icon: <ExclamationTriangle /> };
+        return { variant: 'success', text: 'OK', icon: <CheckCircle /> };
+    };
+
+    if (!user) {
+        return <Container><p>Carregando...</p></Container>;
     }
-  };
 
-  const formatDate = (dateString) => {
-    try {
-      if (!dateString) return 'N/A';
-      return new Date(dateString).toLocaleDateString('pt-BR');
-    } catch (err) {
-      return 'N/A';
-    }
-  };
-
-  if (!user) {
-    return <Container><p>Carregando...</p></Container>;
-  }
-
-  if (error) {
     return (
-      <Container>
-        <Alert variant="danger">
-          <Alert.Heading>Erro ao carregar estoque</Alert.Heading>
-          <p>{error}</p>
-          <hr />
-          <p className="mb-0">
-            Abra o Console do navegador (F12) para ver detalhes do erro.
-          </p>
-        </Alert>
-      </Container>
+        <Container fluid>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 className="h3 mb-1">Gestão de Estoque</h1>
+                    <p className="text-muted mb-0">Gerencie seus produtos, estoques e preços</p>
+                </div>
+                <Button variant="primary" onClick={handleCreate}>
+                    <Plus size={20} className="me-2" />
+                    Novo Produto
+                </Button>
+            </div>
+
+            {/* KPIs */}
+            <Row className="mb-4">
+                <Col md={6} lg>
+                    <Card className="text-center">
+                        <Card.Body>
+                            <p className="text-muted small mb-1">Total de Produtos</p>
+                            <h4 className="mb-0">{stats.totalProducts}</h4>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col md={6} lg>
+                    <Card className="text-center">
+                        <Card.Body>
+                            <p className="text-muted small mb-1">Valor do Estoque</p>
+                            <h4 className="mb-0 text-success">R$ {stats.totalValue.toFixed(2)}</h4>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col md={6} lg>
+                    <Card className="text-center">
+                        <Card.Body>
+                            <p className="text-muted small mb-1">Custo do Estoque</p>
+                            <h4 className="mb-0 text-primary">R$ {stats.totalCost.toFixed(2)}</h4>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col md={3} lg>
+                    <Card className="text-center">
+                        <Card.Body>
+                            <p className="text-muted small mb-1">Estoque Baixo</p>
+                            <h4 className="mb-0 text-warning">{stats.lowStock}</h4>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col md={3} lg>
+                    <Card className="text-center">
+                        <Card.Body>
+                            <p className="text-muted small mb-1">Sem Estoque</p>
+                            <h4 className="mb-0 text-danger">{stats.outOfStock}</h4>
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
+
+            {/* Filtros */}
+            <Card className="mb-4">
+                <Card.Body>
+                    <Row>
+                        <Col md={6}>
+                            <InputGroup>
+                                <InputGroup.Text>
+                                    <Search />
+                                </InputGroup.Text>
+                                <Form.Control 
+                                    placeholder="Buscar por nome, SKU ou marca..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </InputGroup>
+                        </Col>
+                        <Col md={3}>
+                            <Form.Select 
+                                value={categoryFilter}
+                                onChange={(e) => setCategoryFilter(e.target.value)}
+                            >
+                                <option value="all">Todas as Categorias</option>
+                                {categories.map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                            </Form.Select>
+                        </Col>
+                        <Col md={3}>
+                            <Form.Select 
+                                value={stockFilter}
+                                onChange={(e) => setStockFilter(e.target.value)}
+                            >
+                                <option value="all">Todos os Estoques</option>
+                                <option value="ok">Estoque OK</option>
+                                <option value="low">Estoque Baixo</option>
+                                <option value="out">Sem Estoque</option>
+                            </Form.Select>
+                        </Col>
+                    </Row>
+                </Card.Body>
+            </Card>
+
+            {/* Tabela de Produtos */}
+            <Card>
+                <Card.Body className="p-0">
+                    <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                        <Table hover responsive className="mb-0 align-middle">
+                            <thead style={{ position: 'sticky', top: 0, backgroundColor: '#fff', zIndex: 1 }}>
+                                <tr>
+                                    <th>Produto</th>
+                                    <th>SKU</th>
+                                    <th>Categoria</th>
+                                    <th>Marca</th>
+                                    <th className="text-center">Estoque</th>
+                                    <th className="text-end">Custo</th>
+                                    <th className="text-end">Preço</th>
+                                    <th className="text-end">Margem</th>
+                                    <th className="text-center">Status</th>
+                                    <th className="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredInventory.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="10" className="text-center text-muted py-4">
+                                            Nenhum produto encontrado
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredInventory.map(item => {
+                                        const margin = item.custoMedio > 0 
+                                            ? (((item.precoVenda - item.custoMedio) / item.custoMedio) * 100).toFixed(1)
+                                            : 0;
+                                        const status = getStockStatus(item.estoque);
+                                        
+                                        return (
+                                            <tr key={item.id}>
+                                                <td>
+                                                    <div>
+                                                        <div className="fw-semibold">{item.nome}</div>
+                                                        {item.dataValidade && (
+                                                            <small className="text-muted">
+                                                                Val: {new Date(item.dataValidade).toLocaleDateString('pt-BR')}
+                                                            </small>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td><small className="font-monospace">{item.sku}</small></td>
+                                                <td><Badge bg="secondary">{item.categoria}</Badge></td>
+                                                <td>{item.marca}</td>
+                                                <td className="text-center">
+                                                    <span className={item.estoque <= 10 ? 'fw-bold' : ''}>
+                                                        {item.estoque}
+                                                    </span>
+                                                </td>
+                                                <td className="text-end">R$ {item.custoMedio.toFixed(2)}</td>
+                                                <td className="text-end fw-bold">R$ {item.precoVenda.toFixed(2)}</td>
+                                                <td className="text-end">{margin}%</td>
+                                                <td className="text-center">
+                                                    <Badge bg={status.variant} className="d-flex align-items-center justify-content-center gap-1" style={{fontSize: '0.75rem'}}>
+                                                        {status.icon}
+                                                        {status.text}
+                                                    </Badge>
+                                                </td>
+                                                <td className="text-center">
+                                                    <div className="d-flex gap-2 justify-content-center">
+                                                        <Button 
+                                                            variant="outline-primary" 
+                                                            size="sm"
+                                                            onClick={() => handleEdit(item)}
+                                                        >
+                                                            <PencilSquare size={14} />
+                                                        </Button>
+                                                        <Button 
+                                                            variant="outline-danger" 
+                                                            size="sm"
+                                                            onClick={() => handleDelete(item)}
+                                                        >
+                                                            <Trash size={14} />
+                                                        </Button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </Table>
+                    </div>
+                </Card.Body>
+            </Card>
+
+            {/* Modal de Criar/Editar */}
+            <Modal show={showModal} onHide={() => setShowModal(false)} size="lg">
+                <Modal.Header closeButton>
+                    <Modal.Title>
+                        {modalMode === 'create' ? 'Cadastrar Novo Produto' : 'Editar Produto'}
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form>
+                        <Row>
+                            <Col md={8}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Nome do Produto *</Form.Label>
+                                    <Form.Control 
+                                        type="text" 
+                                        value={formData.nome}
+                                        onChange={(e) => setFormData({...formData, nome: e.target.value})}
+                                        isInvalid={!!formErrors.nome}
+                                    />
+                                    <Form.Control.Feedback type="invalid">
+                                        {formErrors.nome}
+                                    </Form.Control.Feedback>
+                                </Form.Group>
+                            </Col>
+                            <Col md={4}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>SKU *</Form.Label>
+                                    <Form.Control 
+                                        type="text" 
+                                        value={formData.sku}
+                                        onChange={(e) => setFormData({...formData, sku: e.target.value})}
+                                        isInvalid={!!formErrors.sku}
+                                        disabled={modalMode === 'edit'}
+                                    />
+                                    <Form.Control.Feedback type="invalid">
+                                        {formErrors.sku}
+                                    </Form.Control.Feedback>
+                                </Form.Group>
+                            </Col>
+                        </Row>
+
+                        <Row>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Categoria *</Form.Label>
+                                    <Form.Select 
+                                        value={formData.categoria}
+                                        onChange={(e) => setFormData({...formData, categoria: e.target.value})}
+                                    >
+                                        <option value="Alimentos">Alimentos</option>
+                                        <option value="Bebidas">Bebidas</option>
+                                        <option value="Limpeza">Limpeza</option>
+                                        <option value="Higiene">Higiene</option>
+                                        <option value="Outros">Outros</option>
+                                    </Form.Select>
+                                </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Marca *</Form.Label>
+                                    <Form.Control 
+                                        type="text" 
+                                        value={formData.marca}
+                                        onChange={(e) => setFormData({...formData, marca: e.target.value})}
+                                        isInvalid={!!formErrors.marca}
+                                        placeholder="Ex: Coca-Cola, Nestlé..."
+                                    />
+                                    <Form.Control.Feedback type="invalid">
+                                        {formErrors.marca}
+                                    </Form.Control.Feedback>
+                                </Form.Group>
+                            </Col>
+                        </Row>
+
+                        <Row>
+                            <Col md={4}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Estoque Atual *</Form.Label>
+                                    <Form.Control 
+                                        type="number" 
+                                        value={formData.estoque}
+                                        onChange={(e) => setFormData({...formData, estoque: e.target.value})}
+                                        min="0"
+                                        isInvalid={!!formErrors.estoque}
+                                    />
+                                    <Form.Control.Feedback type="invalid">
+                                        {formErrors.estoque}
+                                    </Form.Control.Feedback>
+                                </Form.Group>
+                            </Col>
+                            <Col md={4}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Custo Médio (R$) *</Form.Label>
+                                    <Form.Control 
+                                        type="number" 
+                                        step="0.01"
+                                        value={formData.custoMedio}
+                                        onChange={(e) => setFormData({...formData, custoMedio: e.target.value})}
+                                        min="0"
+                                        isInvalid={!!formErrors.custoMedio}
+                                    />
+                                    <Form.Control.Feedback type="invalid">
+                                        {formErrors.custoMedio}
+                                    </Form.Control.Feedback>
+                                </Form.Group>
+                            </Col>
+                            <Col md={4}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Preço de Venda (R$) *</Form.Label>
+                                    <Form.Control 
+                                        type="number" 
+                                        step="0.01"
+                                        value={formData.precoVenda}
+                                        onChange={(e) => setFormData({...formData, precoVenda: e.target.value})}
+                                        min="0"
+                                        isInvalid={!!formErrors.precoVenda}
+                                    />
+                                    <Form.Control.Feedback type="invalid">
+                                        {formErrors.precoVenda}
+                                    </Form.Control.Feedback>
+                                </Form.Group>
+                            </Col>
+                        </Row>
+
+                        <Row>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Data de Validade</Form.Label>
+                                    <Form.Control 
+                                        type="date" 
+                                        value={formData.dataValidade}
+                                        onChange={(e) => setFormData({...formData, dataValidade: e.target.value})}
+                                    />
+                                    <Form.Text className="text-muted">
+                                        Opcional - deixe em branco se não aplicável
+                                    </Form.Text>
+                                </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Margem de Lucro</Form.Label>
+                                    <Form.Control 
+                                        type="text" 
+                                        value={`${calculateMargin()}%`}
+                                        disabled
+                                    />
+                                    <Form.Text className="text-muted">
+                                        Calculado automaticamente
+                                    </Form.Text>
+                                </Form.Group>
+                            </Col>
+                        </Row>
+
+                        <Alert variant="info" className="mb-0">
+                            <small>
+                                <strong>Dica:</strong> A margem de lucro é calculada como: 
+                                ((Preço de Venda - Custo) / Custo) × 100
+                            </small>
+                        </Alert>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowModal(false)}>
+                        Cancelar
+                    </Button>
+                    <Button variant="primary" onClick={handleSave}>
+                        {modalMode === 'create' ? 'Cadastrar' : 'Salvar Alterações'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* Modal de Exclusão */}
+            <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>Confirmar Exclusão</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Alert variant="danger" className="mb-3">
+                        <strong>⚠️ Atenção!</strong> Esta ação não pode ser desfeita.
+                    </Alert>
+                    {selectedItem && (
+                        <p>
+                            Você está prestes a excluir o produto:<br/>
+                            <strong>{selectedItem.nome}</strong> (SKU: {selectedItem.sku})
+                        </p>
+                    )}
+                    <p className="mb-0">Tem certeza que deseja continuar?</p>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+                        Cancelar
+                    </Button>
+                    <Button variant="danger" onClick={confirmDelete}>
+                        <Trash className="me-2" />
+                        Sim, Excluir
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+        </Container>
     );
-  }
-
-  return (
-    <Container fluid>
-      <h1 className="h3 mb-3">Gestão de Estoque</h1>
-
-      <Card className="mb-4">
-        <Card.Body>
-          <Row>
-            <Col md={4}>
-              <Form.Group>
-                <Form.Label>Filtrar por Categoria</Form.Label>
-                <Form.Select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
-                  <option value="all">Todas as Categorias</option>
-                  {uniqueCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={8} className="d-flex align-items-end">
-              <small className="text-muted">
-                Total de itens: {filteredItems.length}
-              </small>
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card>
-
-      <Card>
-        <Table striped hover responsive className="mb-0 align-middle">
-          <thead>
-            <tr>
-              <th>SKU</th>
-              <th>Produto</th>
-              <th>Marca</th>
-              <th className="text-center">Estoque Atual</th>
-              <th>Custo Médio</th>
-              <th>Preço Venda</th>
-              <th>Lucro Est. (Un)</th>
-              <th>Validade</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredItems.length === 0 ? (
-              <tr>
-                <td colSpan="9" className="text-center text-muted">
-                  Nenhum produto no estoque
-                </td>
-              </tr>
-            ) : (
-              filteredItems.map((item, index) => {
-                try {
-                  return (
-                    <tr key={item.id || index}>
-                      <td><small>{item.sku || 'N/A'}</small></td>
-                      <td>{item.nome || 'Produto sem nome'}</td>
-                      <td><small className="text-muted">{item.marca || 'N/A'}</small></td>
-                      <td className="text-center">
-                        <Badge bg="primary" pill className="p-2 fs-6">
-                          {item.estoque ?? 0}
-                        </Badge>
-                      </td>
-                      <td>{item.custoMedio ? `R$ ${parseFloat(item.custoMedio).toFixed(2)}` : 'N/A'}</td>
-                      <td>{item.precoVenda ? `R$ ${parseFloat(item.precoVenda).toFixed(2)}` : 'N/A'}</td>
-                      <td>
-                        {item.precoVenda && item.custoMedio ? (
-                          <span className="text-success fw-bold">
-                            R$ {(parseFloat(item.precoVenda) - parseFloat(item.custoMedio)).toFixed(2)}
-                          </span>
-                        ) : 'N/A'}
-                      </td>
-                      <td>{formatDate(item.dataValidade)}</td>
-                      <td>
-                        <Button variant="success" size="sm" className="me-2" onClick={() => handleOpenModal(item, 'entrada')}>
-                          Entrada
-                        </Button>
-                        <Button variant="warning" size="sm" onClick={() => handleOpenModal(item, 'ajuste')}>
-                          Ajuste
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                } catch (err) {
-                  console.error('ERRO ao renderizar item:', item, err);
-                  return (
-                    <tr key={index}>
-                      <td colSpan="9" className="text-danger">
-                        Erro ao exibir produto (ver console)
-                      </td>
-                    </tr>
-                  );
-                }
-              })
-            )}
-          </tbody>
-        </Table>
-      </Card>
-
-      <Modal show={showModal} onHide={handleCloseModal}>
-        <Modal.Header closeButton>
-          <Modal.Title>
-            {modalType === 'entrada' ? 'Registrar Entrada' : 'Ajustar Estoque'} de {currentItem?.nome}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>Estoque Atual: <strong>{currentItem?.estoque ?? 0}</strong></p>
-          <Form.Group>
-            <Form.Label>
-              {modalType === 'entrada' ? 'Quantidade a Adicionar' : 'Novo Valor do Estoque'}
-            </Form.Label>
-            <Form.Control 
-              type="number" 
-              value={adjustmentValue}
-              onChange={(e) => setAdjustmentValue(e.target.value)}
-              min="0"
-              autoFocus
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseModal}>
-            Cancelar
-          </Button>
-          <Button variant="primary" onClick={handleUpdateStock}>
-            Salvar Alterações
-          </Button>
-        </Modal.Footer>
-      </Modal>
-    </Container>
-  );
 };
 
 export default Inventory;

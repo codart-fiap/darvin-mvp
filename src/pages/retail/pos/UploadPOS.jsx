@@ -1,10 +1,5 @@
 // --- ARQUIVO: src/pages/retail/pos/UploadPOS.jsx ---
 // --- TECNOLOGIA: React, JSX, JavaScript ---
-// Componente multifásico para upload de planilhas de vendas:
-// 1. Tela de Upload (Arrastar e Soltar)
-// 2. Tela de Mapeamento de Colunas
-// 3. Tela de Validação de Dados
-// 4. (Futuro) Tela de Confirmação Final
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
@@ -13,7 +8,6 @@ import { setItem, getItem } from '../../../state/storage';
 import { generateId } from '../../../utils/ids';
 import { Container, Button, Alert, Table, Row, Col, Form, OverlayTrigger, Tooltip, Card, Modal } from 'react-bootstrap';
 
-// Definição dos campos que nossa plataforma espera.
 const PLATFORM_FIELDS = [
     { key: 'product_name', name: 'Nome do Produto', description: 'O nome do produto vendido.', tooltip: 'Este campo deve conter o nome ou SKU do produto.', required: true },
     { key: 'quantity', name: 'Quantidade Vendida', description: 'A quantidade de unidades vendidas.', tooltip: 'Informe o número de unidades vendidas.', required: true },
@@ -24,7 +18,6 @@ const PLATFORM_FIELDS = [
     { key: 'product_sku', name: 'SKU / Código do Produto', description: 'Código identificador do produto (opcional).', tooltip: 'Código de barras ou SKU para identificação precisa.', required: false }
 ];
 
-// --- Ícones como Componentes SVG ---
 const CheckmarkIcon = () => ( 
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-check-circle-fill text-primary" viewBox="0 0 16 16">
         <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
@@ -44,8 +37,6 @@ const ErrorIcon = () => (
     </svg> 
 );
 
-
-// Componente principal
 const UploadPOS = () => {
     const { user } = useAuth();
     const [step, setStep] = useState('upload'); 
@@ -57,7 +48,59 @@ const UploadPOS = () => {
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef(null);
 
-    // Carrega a biblioteca XLSX de um CDN
+    const parseDate = (dateString) => {
+        if (dateString instanceof Date && !isNaN(dateString)) {
+            return dateString;
+        }
+        
+        if (typeof dateString !== 'string') {
+            const attempted = new Date(dateString);
+            return isNaN(attempted) ? new Date('invalid') : attempted;
+        }
+        
+        const trimmed = dateString.trim();
+        if (!trimmed) return new Date('invalid');
+        
+        const brFormatMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2}):(\d{1,2}))?/);
+        if (brFormatMatch) {
+            const [, day, month, year, hour = 0, minute = 0, second = 0] = brFormatMatch;
+            const date = new Date(
+                parseInt(year, 10),
+                parseInt(month, 10) - 1,
+                parseInt(day, 10),
+                parseInt(hour, 10),
+                parseInt(minute, 10),
+                parseInt(second, 10)
+            );
+            
+            if (!isNaN(date.getTime())) {
+                return date;
+            }
+        }
+        
+        const isoDate = new Date(trimmed);
+        if (!isNaN(isoDate.getTime())) {
+            return isoDate;
+        }
+        
+        const usFormatMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (usFormatMatch) {
+            const [, monthOrDay, dayOrMonth, year] = usFormatMatch;
+            
+            const dateBR = new Date(parseInt(year, 10), parseInt(monthOrDay, 10) - 1, parseInt(dayOrMonth, 10));
+            if (!isNaN(dateBR.getTime()) && dateBR.getDate() === parseInt(dayOrMonth, 10)) {
+                return dateBR;
+            }
+            
+            const dateUS = new Date(parseInt(year, 10), parseInt(monthOrDay, 10) - 1, parseInt(dayOrMonth, 10));
+            if (!isNaN(dateUS.getTime())) {
+                return dateUS;
+            }
+        }
+        
+        return new Date('invalid');
+    };
+
     useEffect(() => {
         const scriptId = 'xlsx-script';
         if (document.getElementById(scriptId)) return;
@@ -74,15 +117,12 @@ const UploadPOS = () => {
 
     const inventory = useMemo(() => user ? getInventoryByRetailer(user.actorId) : [], [user]);
 
-    // Função para atualizar resultados após cadastrar produto
     const handleProductRegistered = (productData, newProduct, newInventoryItem, directUpdate = null) => {
-        // Se recebeu atualização direta (cadastro em massa), usa ela
         if (directUpdate) {
             setValidationResults(directUpdate);
             return;
         }
 
-        // Caso contrário, faz a atualização individual
         const updatedResults = {
             ...validationResults,
             all: validationResults.all.map(row => 
@@ -106,7 +146,6 @@ const UploadPOS = () => {
             )
         };
 
-        // Recalcula as listas
         updatedResults.valid = updatedResults.all.filter(r => r.status === 'valid');
         updatedResults.newProduct = updatedResults.all.filter(r => r.status === 'newProduct');
         updatedResults.error = updatedResults.all.filter(r => r.status === 'error');
@@ -138,7 +177,7 @@ const UploadPOS = () => {
                     type: 'binary', 
                     cellDates: true,
                     raw: false,
-                    codepage: 65001 // UTF-8
+                    codepage: 65001
                 });
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
@@ -179,7 +218,6 @@ const UploadPOS = () => {
         setError('');
         const mappedIndices = {};
         
-        // Valida apenas campos obrigatórios
         for (const field of PLATFORM_FIELDS.filter(f => f.required)) {
             if (!columnMap[field.key]) {
                 setError(`O campo obrigatório "${field.name}" precisa ser mapeado.`);
@@ -188,14 +226,12 @@ const UploadPOS = () => {
             mappedIndices[field.key] = fileHeaders.indexOf(columnMap[field.key]);
         }
         
-        // Mapeia campos opcionais
         for (const field of PLATFORM_FIELDS.filter(f => !f.required)) {
             if (columnMap[field.key]) {
                 mappedIndices[field.key] = fileHeaders.indexOf(columnMap[field.key]);
             }
         }
 
-        // Verifica estratégia de agrupamento
         const hasTransactionId = mappedIndices.transaction_id !== undefined;
         const groupingStrategy = hasTransactionId ? 'transaction_id' : 'datetime';
 
@@ -214,31 +250,47 @@ const UploadPOS = () => {
             const unitPriceRaw = cleanValue(row[mappedIndices.unit_price]);
             const saleDateRaw = row[mappedIndices.sale_date];
             
-            // Campos opcionais
             const transactionId = mappedIndices.transaction_id !== undefined 
                 ? cleanValue(row[mappedIndices.transaction_id]) 
                 : null;
             const unitCost = mappedIndices.unit_cost !== undefined 
                 ? cleanValue(row[mappedIndices.unit_cost]) 
                 : null;
-            const productSku = mappedIndices.product_sku !== undefined 
+            
+            // ✅ CORREÇÃO: Remove o prefixo "SKU-" se existir e limpa o valor
+            let productSku = mappedIndices.product_sku !== undefined 
                 ? cleanValue(row[mappedIndices.product_sku]) 
                 : null;
+            
+            if (productSku && productSku.toLowerCase().startsWith('sku-')) {
+                productSku = productSku.substring(4).trim();
+            }
+
+            let parsedDate;
+            if (saleDateRaw instanceof Date && !isNaN(saleDateRaw)) {
+                parsedDate = saleDateRaw;
+            } else {
+                parsedDate = parseDate(String(saleDateRaw));
+                if (isNaN(parsedDate.getTime())) {
+                    console.warn(`⚠️ Linha ${index + 2}: Data inválida "${saleDateRaw}" para produto "${productNameRaw}"`);
+                }
+            }
 
             const saleData = {
                 productName: productNameRaw,
                 quantity: quantityRaw ? parseFloat(quantityRaw.replace(',','.')) : NaN,
                 unitPrice: unitPriceRaw ? parseFloat(unitPriceRaw.replace(',','.')) : NaN,
-                saleDate: saleDateRaw instanceof Date ? saleDateRaw : new Date(saleDateRaw),
+                saleDate: parsedDate,
                 transactionId: transactionId,
                 unitCost: unitCost ? parseFloat(unitCost.replace(',','.')) : null,
                 productSku: productSku,
                 originalRow: index + 2,
+                rawDateValue: saleDateRaw
             };
             
             let status = 'valid';
             
-            // Busca produto por SKU (se fornecido) ou por nome
+            // ✅ CORREÇÃO: Busca produto e usa o SKU dele se encontrado
             let product = null;
             if (productSku) {
                 product = inventory.find(p => p.sku === productSku);
@@ -247,12 +299,15 @@ const UploadPOS = () => {
                 product = inventory.find(p => p.nome === productNameRaw);
             }
 
+            // Se encontrou o produto, usa o SKU dele
+            const finalSku = product ? product.sku : productSku;
+
             if (!product) status = 'newProduct';
             else if (isNaN(saleData.quantity) || saleData.quantity <= 0) status = 'error';
             else if (isNaN(saleData.unitPrice) || saleData.unitPrice < 0) status = 'error';
             else if (isNaN(saleData.saleDate.getTime())) status = 'error';
             
-            const resultRow = { ...saleData, status, product };
+            const resultRow = { ...saleData, productSku: finalSku, status, product };
             results.all.push(resultRow);
             results[status].push(resultRow);
         });
@@ -264,7 +319,6 @@ const UploadPOS = () => {
     const handleFinalImport = () => {
         const allSales = getItem('sales') || [];
         
-        // Agrupa as vendas válidas
         const groupedSales = groupTransactions(validationResults.valid, validationResults.groupingStrategy);
         
         const newSales = groupedSales.map(group => {
@@ -277,6 +331,7 @@ const UploadPOS = () => {
                 clienteId: 'consumidor_final',
                 itens: group.items.map(item => ({
                     productId: item.product?.productId || item.product?.id,
+                    // ✅ CORREÇÃO: Usa o SKU do produto encontrado ou o da planilha (já limpo)
                     sku: item.product?.sku || item.productSku || 'SKU-UNKNOWN',
                     qtde: item.quantity, 
                     precoUnit: item.unitPrice,
@@ -305,10 +360,8 @@ const UploadPOS = () => {
         resetForNewUpload();
     };
 
-    // Função para agrupar transações
     const groupTransactions = (validItems, strategy) => {
         if (strategy === 'transaction_id') {
-            // Agrupa por ID de transação
             const groups = {};
             
             validItems.forEach(item => {
@@ -327,7 +380,6 @@ const UploadPOS = () => {
             
             return Object.values(groups);
         } else {
-            // Agrupa por data/hora exata (precisão de segundos)
             const groups = {};
             
             validItems.forEach(item => {
@@ -382,7 +434,6 @@ const UploadPOS = () => {
     return <div className="upload-container">{renderStep()}</div>;
 };
 
-// --- Sub-componentes para cada etapa ---
 const UploadStep = ({ processFile, isDragging, setIsDragging, fileInputRef }) => {
     const handleDragEnter = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
     const handleDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
@@ -586,13 +637,11 @@ const ValidationStep = ({ results, onConfirm, onCancel, onProductRegistered, use
 
         const allProducts = getItem('products') || [];
         const allInventory = getItem('inventory') || [];
-        const industries = getItem('industries') || [];
         
         const newProducts = [];
         const newInventoryItems = [];
         const productDataMap = new Map();
         
-        // Processa todos os produtos pendentes
         results.newProduct.forEach((row) => {
             const productId = generateId();
             
@@ -629,7 +678,6 @@ const ValidationStep = ({ results, onConfirm, onCancel, onProductRegistered, use
             newProducts.push(newProduct);
             newInventoryItems.push(newInventoryItem);
             
-            // Mapeia os dados para atualização posterior
             const key = `${row.productName}-${row.originalRow}`;
             productDataMap.set(key, {
                 row,
@@ -637,18 +685,15 @@ const ValidationStep = ({ results, onConfirm, onCancel, onProductRegistered, use
             });
         });
         
-        // Salva todos de uma vez no localStorage
         setItem('products', [...allProducts, ...newProducts]);
         setItem('inventory', [...allInventory, ...newInventoryItems]);
         
-        // Atualiza o estado uma única vez com todas as mudanças
         const updatedResults = {
             ...results,
             all: results.all.map(row => {
                 const key = `${row.productName}-${row.originalRow}`;
                 if (productDataMap.has(key)) {
                     const data = productDataMap.get(key);
-                    // Garante que o product tem o ID correto
                     return { 
                         ...row, 
                         status: 'valid', 
@@ -669,12 +714,10 @@ const ValidationStep = ({ results, onConfirm, onCancel, onProductRegistered, use
             })
         };
         
-        // Recalcula as listas
         updatedResults.valid = updatedResults.all.filter(r => r.status === 'valid');
         updatedResults.newProduct = updatedResults.all.filter(r => r.status === 'newProduct');
         updatedResults.error = updatedResults.all.filter(r => r.status === 'error');
         
-        // Chama o callback do pai com os resultados atualizados diretamente
         onProductRegistered(null, null, null, updatedResults);
     };
 
@@ -726,7 +769,6 @@ const ValidationStep = ({ results, onConfirm, onCancel, onProductRegistered, use
                         </Col>
                     </Row>
                     
-                    {/* Alerta sobre estratégia de agrupamento */}
                     {results.groupingStrategy === 'datetime' && (
                         <Alert variant="info" className="mt-3 mb-0">
                             <strong>ℹ️ Informação sobre Agrupamento:</strong> Não identificamos uma coluna de ID de transação. Para organizar os dados, as vendas que ocorreram exatamente no mesmo horário serão agrupadas em uma única compra. Por favor, verifique o resultado após a importação.
@@ -779,7 +821,20 @@ const ValidationStep = ({ results, onConfirm, onCancel, onProductRegistered, use
                             return (
                                 <tr key={index} className={`row-${row.status}`}>
                                     <td>
-                                        {row.status === 'error' && <ErrorIcon />}
+                                        {row.status === 'error' && (
+                                            <OverlayTrigger
+                                                placement="top"
+                                                overlay={
+                                                    <Tooltip>
+                                                        {isNaN(row.saleDate.getTime()) 
+                                                            ? `Data inválida: "${row.rawDateValue}". Use formato DD/MM/AAAA`
+                                                            : 'Verifique quantidade e preço'}
+                                                    </Tooltip>
+                                                }
+                                            >
+                                                <span><ErrorIcon /></span>
+                                            </OverlayTrigger>
+                                        )}
                                         {renderDate(row.saleDate)}
                                     </td>
                                     <td style={{ wordBreak: 'break-word' }}>
@@ -821,7 +876,6 @@ const ValidationStep = ({ results, onConfirm, onCancel, onProductRegistered, use
                 </Button>
             </div>
 
-            {/* Modal de Cadastro de Produto */}
             <Modal show={showProductModal} onHide={() => setShowProductModal(false)} size="lg">
                 <Modal.Header closeButton>
                     <Modal.Title>Cadastrar Novo Produto</Modal.Title>
@@ -941,6 +995,5 @@ const ValidationStep = ({ results, onConfirm, onCancel, onProductRegistered, use
         </div>
     );
 };
-
 
 export default UploadPOS;
