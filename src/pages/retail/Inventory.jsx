@@ -1,15 +1,15 @@
 // FILE: src/pages/retail/Inventory.jsx
 import React, { useState, useMemo, useEffect } from 'react';
-import { useAuth } from '../../hooks/useAuth';
-import { getInventoryByRetailer } from '../../state/selectors';
-import { getItem, setItem } from '../../state/storage';
-import { generateId } from '../../utils/ids';
-import { 
-    Container, Row, Col, Card, Table, Button, Form, 
-    Modal, Alert, Badge, InputGroup, OverlayTrigger, Tooltip 
+import { useAuth } from '../../hooks/useAuth.js';
+import { getInventoryByRetailer } from '../../state/selectors.js';
+import { getItem, setItem } from '../../state/storage.js';
+import { generateId } from '../../utils/ids.js';
+import {
+    Container, Row, Col, Card, Table, Button, Form,
+    Modal, Alert, Badge, InputGroup, OverlayTrigger, Tooltip
 } from 'react-bootstrap';
-import { 
-    Search, Plus, PencilSquare, Trash, 
+import {
+    Search, Plus, PencilSquare, Trash,
     BoxSeam, ExclamationTriangle, CheckCircle,
     FunnelFill, XCircle
 } from 'react-bootstrap-icons';
@@ -20,11 +20,15 @@ const Inventory = () => {
     const [showModal, setShowModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [modalMode, setModalMode] = useState('create'); // 'create' ou 'edit'
-    const [selectedItem, setSelectedItem] = useState(null);
+    const [selectedItem, setSelectedItem] = useState(null); // Para edição/exclusão única
+    const [selectedProducts, setSelectedProducts] = useState(new Set()); // Para seleção múltipla
+
+    // Filtros
     const [searchTerm, setSearchTerm] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('all');
     const [stockFilter, setStockFilter] = useState('all');
-    
+    const [sourceFilter, setSourceFilter] = useState('all');
+
     const [formData, setFormData] = useState({
         nome: '',
         sku: '',
@@ -47,26 +51,31 @@ const Inventory = () => {
     const loadInventory = () => {
         const data = getInventoryByRetailer(user.actorId);
         setInventory(data);
+        setSelectedProducts(new Set());
     };
 
     // Filtros e busca
     const filteredInventory = useMemo(() => {
         return inventory.filter(item => {
-            const matchesSearch = !searchTerm || 
+            const matchesSearch = !searchTerm ||
                 item.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 item.marca.toLowerCase().includes(searchTerm.toLowerCase());
-            
+
             const matchesCategory = categoryFilter === 'all' || item.categoria === categoryFilter;
-            
+
             let matchesStock = true;
             if (stockFilter === 'low') matchesStock = item.estoque > 0 && item.estoque <= 10;
             else if (stockFilter === 'out') matchesStock = item.estoque === 0;
             else if (stockFilter === 'ok') matchesStock = item.estoque > 10;
-            
-            return matchesSearch && matchesCategory && matchesStock;
+
+            let matchesSource = true;
+            if (sourceFilter === 'imported') matchesSource = item.marca === 'Importado';
+            else if (sourceFilter === 'native') matchesSource = item.marca !== 'Importado';
+
+            return matchesSearch && matchesCategory && matchesStock && matchesSource;
         });
-    }, [inventory, searchTerm, categoryFilter, stockFilter]);
+    }, [inventory, searchTerm, categoryFilter, stockFilter, sourceFilter]);
 
     // Estatísticas
     const stats = useMemo(() => {
@@ -84,6 +93,25 @@ const Inventory = () => {
         return [...new Set(inventory.map(item => item.categoria))].sort();
     }, [inventory]);
 
+    // Funções de Seleção Múltipla
+    const toggleSelect = (productId) => {
+        const newSelection = new Set(selectedProducts);
+        if (newSelection.has(productId)) {
+            newSelection.delete(productId);
+        } else {
+            newSelection.add(productId);
+        }
+        setSelectedProducts(newSelection);
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedProducts.size === filteredInventory.length) {
+            setSelectedProducts(new Set());
+        } else {
+            setSelectedProducts(new Set(filteredInventory.map(item => item.id)));
+        }
+    };
+    
     // Abrir modal para criar
     const handleCreate = () => {
         setModalMode('create');
@@ -119,17 +147,26 @@ const Inventory = () => {
         setShowModal(true);
     };
 
+    // Função centralizada para atualizar o formulário
+    const handleFormChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prevData => ({
+            ...prevData,
+            [name]: value
+        }));
+    };
+
     // Validação do formulário
     const validateForm = () => {
         const errors = {};
-        
+
         if (!formData.nome.trim()) errors.nome = 'Nome é obrigatório';
         if (!formData.sku.trim()) errors.sku = 'SKU é obrigatório';
         if (!formData.marca.trim()) errors.marca = 'Marca é obrigatória';
         if (formData.estoque < 0) errors.estoque = 'Estoque não pode ser negativo';
         if (formData.custoMedio < 0) errors.custoMedio = 'Custo não pode ser negativo';
         if (formData.precoVenda <= 0) errors.precoVenda = 'Preço de venda deve ser maior que zero';
-        
+
         setFormErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -138,116 +175,116 @@ const Inventory = () => {
     const handleSave = () => {
         if (!validateForm()) return;
 
+        // Verificação de SKU duplicado
+        if (modalMode === 'create') {
+            if (inventory.some(item => item.sku === formData.sku)) {
+                setFormErrors(prev => ({ ...prev, sku: 'Este SKU já está em uso.' }));
+                return;
+            }
+        } else { // modo 'edit'
+            if (inventory.some(item => item.sku === formData.sku && item.id !== selectedItem.id)) {
+                setFormErrors(prev => ({ ...prev, sku: 'Este SKU já está em uso por outro produto.' }));
+                return;
+            }
+        }
+
         try {
             const allProducts = getItem('products') || [];
             const allInventory = getItem('inventory') || [];
 
             if (modalMode === 'create') {
-                // Criar novo produto
                 const productId = generateId();
-                
+
                 const newProduct = {
-                    id: productId,
-                    sku: formData.sku,
-                    nome: formData.nome,
-                    categoria: formData.categoria,
-                    subcategoria: formData.categoria,
-                    industryId: 'generic',
-                    precoSugerido: parseFloat(formData.precoVenda),
-                    supplierIds: [],
-                    marca: formData.marca
+                    id: productId, sku: formData.sku, nome: formData.nome, categoria: formData.categoria,
+                    subcategoria: formData.categoria, industryId: 'generic', precoSugerido: parseFloat(formData.precoVenda),
+                    supplierIds: [], marca: formData.marca
                 };
-                
-                const validade = formData.dataValidade 
+
+                const validade = formData.dataValidade
                     ? new Date(formData.dataValidade).toISOString()
                     : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
-                
+
                 const newInventoryItem = {
-                    id: generateId(),
-                    retailerId: user.actorId,
-                    productId: productId,
-                    nome: formData.nome,
-                    sku: formData.sku,
-                    categoria: formData.categoria,
-                    marca: formData.marca,
-                    estoque: parseInt(formData.estoque),
-                    custoMedio: parseFloat(formData.custoMedio),
-                    precoVenda: parseFloat(formData.precoVenda),
-                    precoSugerido: parseFloat(formData.precoVenda),
+                    id: generateId(), retailerId: user.actorId, productId: productId, nome: formData.nome,
+                    sku: formData.sku, categoria: formData.categoria, marca: formData.marca,
+                    estoque: parseInt(formData.estoque), custoMedio: parseFloat(formData.custoMedio),
+                    precoVenda: parseFloat(formData.precoVenda), precoSugerido: parseFloat(formData.precoVenda),
                     dataValidade: validade
                 };
-                
+
                 setItem('products', [...allProducts, newProduct]);
                 setItem('inventory', [...allInventory, newInventoryItem]);
-                
+
             } else {
-                // Editar produto existente
-                const updatedProducts = allProducts.map(p => 
-                    p.id === selectedItem.productId 
+                const updatedProducts = allProducts.map(p =>
+                    p.id === selectedItem.productId
                         ? { ...p, nome: formData.nome, sku: formData.sku, marca: formData.marca, categoria: formData.categoria, precoSugerido: parseFloat(formData.precoVenda) }
                         : p
                 );
-                
-                const validade = formData.dataValidade 
+
+                const validade = formData.dataValidade
                     ? new Date(formData.dataValidade).toISOString()
                     : selectedItem.dataValidade;
-                
-                const updatedInventory = allInventory.map(inv => 
+
+                const updatedInventory = allInventory.map(inv =>
                     inv.id === selectedItem.id
                         ? {
-                            ...inv,
-                            nome: formData.nome,
-                            sku: formData.sku,
-                            categoria: formData.categoria,
-                            marca: formData.marca,
-                            estoque: parseInt(formData.estoque),
-                            custoMedio: parseFloat(formData.custoMedio),
-                            precoVenda: parseFloat(formData.precoVenda),
-                            precoSugerido: parseFloat(formData.precoVenda),
+                            ...inv, nome: formData.nome, sku: formData.sku, categoria: formData.categoria,
+                            marca: formData.marca, estoque: parseInt(formData.estoque), custoMedio: parseFloat(formData.custoMedio),
+                            precoVenda: parseFloat(formData.precoVenda), precoSugerido: parseFloat(formData.precoVenda),
                             dataValidade: validade
                         }
                         : inv
                 );
-                
+
                 setItem('products', updatedProducts);
                 setItem('inventory', updatedInventory);
             }
-            
+
             setShowModal(false);
             loadInventory();
-            
-            const message = modalMode === 'create' 
-                ? 'Produto cadastrado com sucesso!' 
+
+            const message = modalMode === 'create'
+                ? 'Produto cadastrado com sucesso!'
                 : 'Produto atualizado com sucesso!';
             alert(message);
-            
+
         } catch (error) {
             console.error('Erro ao salvar produto:', error);
             alert('Erro ao salvar produto. Tente novamente.');
         }
     };
 
-    // Abrir modal de exclusão
-    const handleDelete = (item) => {
-        setSelectedItem(item);
+    // Abrir modal de exclusão (para um ou vários)
+    const handleDelete = (item = null) => {
+        if (item) {
+            setSelectedItem(item);
+        } else {
+            setSelectedItem(null);
+        }
         setShowDeleteModal(true);
     };
-
+    
     // Confirmar exclusão
     const confirmDelete = () => {
         try {
             const allProducts = getItem('products') || [];
             const allInventory = getItem('inventory') || [];
+
+            const itemsToDelete = selectedItem ? [selectedItem] : inventory.filter(item => selectedProducts.has(item.id));
+            const inventoryIdsToDelete = new Set(itemsToDelete.map(i => i.id));
+            const productIdsToDelete = new Set(itemsToDelete.map(i => i.productId));
             
-            const updatedProducts = allProducts.filter(p => p.id !== selectedItem.productId);
-            const updatedInventory = allInventory.filter(inv => inv.id !== selectedItem.id);
+            const updatedProducts = allProducts.filter(p => !productIdsToDelete.has(p.id));
+            const updatedInventory = allInventory.filter(inv => !inventoryIdsToDelete.has(inv.id));
             
             setItem('products', updatedProducts);
             setItem('inventory', updatedInventory);
             
             setShowDeleteModal(false);
             loadInventory();
-            alert('Produto excluído com sucesso!');
+            alert(`${itemsToDelete.length} produto(s) excluído(s) com sucesso!`);
             
         } catch (error) {
             console.error('Erro ao excluir produto:', error);
@@ -281,15 +318,23 @@ const Inventory = () => {
                     <h1 className="h3 mb-1">Gestão de Estoque</h1>
                     <p className="text-muted mb-0">Gerencie seus produtos, estoques e preços</p>
                 </div>
-                <Button variant="primary" onClick={handleCreate}>
-                    <Plus size={20} className="me-2" />
-                    Novo Produto
-                </Button>
+                <div>
+                    {selectedProducts.size > 0 && (
+                         <Button variant="danger" className="me-2" onClick={() => handleDelete()}>
+                            <Trash size={16} className="me-2" />
+                            Excluir ({selectedProducts.size})
+                        </Button>
+                    )}
+                    <Button variant="primary" onClick={handleCreate}>
+                        <Plus size={20} className="me-2" />
+                        Novo Produto
+                    </Button>
+                </div>
             </div>
 
             {/* KPIs */}
             <Row className="mb-4">
-                <Col md={6} lg>
+                 <Col md={6} lg>
                     <Card className="text-center">
                         <Card.Body>
                             <p className="text-muted small mb-1">Total de Produtos</p>
@@ -335,38 +380,35 @@ const Inventory = () => {
             <Card className="mb-4">
                 <Card.Body>
                     <Row>
-                        <Col md={6}>
+                        <Col md={4}>
                             <InputGroup>
-                                <InputGroup.Text>
-                                    <Search />
-                                </InputGroup.Text>
-                                <Form.Control 
+                                <InputGroup.Text><Search /></InputGroup.Text>
+                                <Form.Control
                                     placeholder="Buscar por nome, SKU ou marca..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
                             </InputGroup>
                         </Col>
-                        <Col md={3}>
-                            <Form.Select 
-                                value={categoryFilter}
-                                onChange={(e) => setCategoryFilter(e.target.value)}
-                            >
+                        <Col md={2}>
+                            <Form.Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
                                 <option value="all">Todas as Categorias</option>
-                                {categories.map(cat => (
-                                    <option key={cat} value={cat}>{cat}</option>
-                                ))}
+                                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                             </Form.Select>
                         </Col>
                         <Col md={3}>
-                            <Form.Select 
-                                value={stockFilter}
-                                onChange={(e) => setStockFilter(e.target.value)}
-                            >
+                             <Form.Select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)}>
                                 <option value="all">Todos os Estoques</option>
                                 <option value="ok">Estoque OK</option>
                                 <option value="low">Estoque Baixo</option>
                                 <option value="out">Sem Estoque</option>
+                            </Form.Select>
+                        </Col>
+                        <Col md={3}>
+                            <Form.Select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+                                <option value="all">Todas as Origens</option>
+                                <option value="native">Cadastro Manual</option>
+                                <option value="imported">Importado via Planilha</option>
                             </Form.Select>
                         </Col>
                     </Row>
@@ -380,6 +422,13 @@ const Inventory = () => {
                         <Table hover responsive className="mb-0 align-middle">
                             <thead style={{ position: 'sticky', top: 0, backgroundColor: '#fff', zIndex: 1 }}>
                                 <tr>
+                                    <th style={{ width: '40px' }}>
+                                        <Form.Check 
+                                            type="checkbox"
+                                            checked={filteredInventory.length > 0 && selectedProducts.size === filteredInventory.length}
+                                            onChange={toggleSelectAll}
+                                        />
+                                    </th>
                                     <th>Produto</th>
                                     <th>SKU</th>
                                     <th>Categoria</th>
@@ -394,63 +443,45 @@ const Inventory = () => {
                             </thead>
                             <tbody>
                                 {filteredInventory.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="10" className="text-center text-muted py-4">
-                                            Nenhum produto encontrado
-                                        </td>
-                                    </tr>
+                                    <tr><td colSpan="11" className="text-center text-muted py-4">Nenhum produto encontrado</td></tr>
                                 ) : (
                                     filteredInventory.map(item => {
-                                        const margin = item.custoMedio > 0 
+                                        const margin = item.custoMedio > 0
                                             ? (((item.precoVenda - item.custoMedio) / item.custoMedio) * 100).toFixed(1)
                                             : 0;
                                         const status = getStockStatus(item.estoque);
-                                        
+
                                         return (
-                                            <tr key={item.id}>
+                                            <tr key={item.id} className={selectedProducts.has(item.id) ? 'table-primary' : ''}>
+                                                <td>
+                                                    <Form.Check 
+                                                        type="checkbox"
+                                                        checked={selectedProducts.has(item.id)}
+                                                        onChange={() => toggleSelect(item.id)}
+                                                    />
+                                                </td>
                                                 <td>
                                                     <div>
                                                         <div className="fw-semibold">{item.nome}</div>
-                                                        {item.dataValidade && (
-                                                            <small className="text-muted">
-                                                                Val: {new Date(item.dataValidade).toLocaleDateString('pt-BR')}
-                                                            </small>
-                                                        )}
+                                                        {item.dataValidade && (<small className="text-muted">Val: {new Date(item.dataValidade).toLocaleDateString('pt-BR')}</small>)}
                                                     </div>
                                                 </td>
                                                 <td><small className="font-monospace">{item.sku}</small></td>
                                                 <td><Badge bg="secondary">{item.categoria}</Badge></td>
                                                 <td>{item.marca}</td>
-                                                <td className="text-center">
-                                                    <span className={item.estoque <= 10 ? 'fw-bold' : ''}>
-                                                        {item.estoque}
-                                                    </span>
-                                                </td>
+                                                <td className="text-center"><span className={item.estoque <= 10 ? 'fw-bold' : ''}>{item.estoque}</span></td>
                                                 <td className="text-end">R$ {item.custoMedio.toFixed(2)}</td>
                                                 <td className="text-end fw-bold">R$ {item.precoVenda.toFixed(2)}</td>
                                                 <td className="text-end">{margin}%</td>
                                                 <td className="text-center">
-                                                    <Badge bg={status.variant} className="d-flex align-items-center justify-content-center gap-1" style={{fontSize: '0.75rem'}}>
-                                                        {status.icon}
-                                                        {status.text}
+                                                    <Badge bg={status.variant} className="d-flex align-items-center justify-content-center gap-1" style={{ fontSize: '0.75rem' }}>
+                                                        {status.icon} {status.text}
                                                     </Badge>
                                                 </td>
                                                 <td className="text-center">
                                                     <div className="d-flex gap-2 justify-content-center">
-                                                        <Button 
-                                                            variant="outline-primary" 
-                                                            size="sm"
-                                                            onClick={() => handleEdit(item)}
-                                                        >
-                                                            <PencilSquare size={14} />
-                                                        </Button>
-                                                        <Button 
-                                                            variant="outline-danger" 
-                                                            size="sm"
-                                                            onClick={() => handleDelete(item)}
-                                                        >
-                                                            <Trash size={14} />
-                                                        </Button>
+                                                        <Button variant="outline-primary" size="sm" onClick={() => handleEdit(item)}><PencilSquare size={14} /></Button>
+                                                        <Button variant="outline-danger" size="sm" onClick={() => handleDelete(item)}><Trash size={14} /></Button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -465,10 +496,8 @@ const Inventory = () => {
 
             {/* Modal de Criar/Editar */}
             <Modal show={showModal} onHide={() => setShowModal(false)} size="lg">
-                <Modal.Header closeButton>
-                    <Modal.Title>
-                        {modalMode === 'create' ? 'Cadastrar Novo Produto' : 'Editar Produto'}
-                    </Modal.Title>
+                 <Modal.Header closeButton>
+                    <Modal.Title>{modalMode === 'create' ? 'Cadastrar Novo Produto' : 'Editar Produto'}</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     <Form>
@@ -476,46 +505,25 @@ const Inventory = () => {
                             <Col md={8}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Nome do Produto *</Form.Label>
-                                    <Form.Control 
-                                        type="text" 
-                                        value={formData.nome}
-                                        onChange={(e) => setFormData({...formData, nome: e.target.value})}
-                                        isInvalid={!!formErrors.nome}
-                                    />
-                                    <Form.Control.Feedback type="invalid">
-                                        {formErrors.nome}
-                                    </Form.Control.Feedback>
+                                    <Form.Control type="text" name="nome" value={formData.nome} onChange={handleFormChange} isInvalid={!!formErrors.nome}/>
+                                    <Form.Control.Feedback type="invalid">{formErrors.nome}</Form.Control.Feedback>
                                 </Form.Group>
                             </Col>
                             <Col md={4}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>SKU *</Form.Label>
-                                    <Form.Control 
-                                        type="text" 
-                                        value={formData.sku}
-                                        onChange={(e) => setFormData({...formData, sku: e.target.value})}
-                                        isInvalid={!!formErrors.sku}
-                                        disabled={modalMode === 'edit'}
-                                    />
-                                    <Form.Control.Feedback type="invalid">
-                                        {formErrors.sku}
-                                    </Form.Control.Feedback>
+                                    <Form.Control type="text" name="sku" value={formData.sku} onChange={handleFormChange} isInvalid={!!formErrors.sku} />
+                                    <Form.Control.Feedback type="invalid">{formErrors.sku}</Form.Control.Feedback>
                                 </Form.Group>
                             </Col>
                         </Row>
-
                         <Row>
                             <Col md={6}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Categoria *</Form.Label>
-                                    <Form.Select 
-                                        value={formData.categoria}
-                                        onChange={(e) => setFormData({...formData, categoria: e.target.value})}
-                                    >
-                                        <option value="Alimentos">Alimentos</option>
-                                        <option value="Bebidas">Bebidas</option>
-                                        <option value="Limpeza">Limpeza</option>
-                                        <option value="Higiene">Higiene</option>
+                                    <Form.Select name="categoria" value={formData.categoria} onChange={handleFormChange}>
+                                        <option value="Alimentos">Alimentos</option> <option value="Bebidas">Bebidas</option>
+                                        <option value="Limpeza">Limpeza</option> <option value="Higiene">Higiene</option>
                                         <option value="Outros">Outros</option>
                                     </Form.Select>
                                 </Form.Group>
@@ -523,114 +531,58 @@ const Inventory = () => {
                             <Col md={6}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Marca *</Form.Label>
-                                    <Form.Control 
-                                        type="text" 
-                                        value={formData.marca}
-                                        onChange={(e) => setFormData({...formData, marca: e.target.value})}
-                                        isInvalid={!!formErrors.marca}
-                                        placeholder="Ex: Coca-Cola, Nestlé..."
-                                    />
-                                    <Form.Control.Feedback type="invalid">
-                                        {formErrors.marca}
-                                    </Form.Control.Feedback>
+                                    <Form.Control type="text" name="marca" value={formData.marca} onChange={handleFormChange} isInvalid={!!formErrors.marca} placeholder="Ex: Coca-Cola, Nestlé..."/>
+                                    <Form.Control.Feedback type="invalid">{formErrors.marca}</Form.Control.Feedback>
                                 </Form.Group>
                             </Col>
                         </Row>
-
                         <Row>
                             <Col md={4}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Estoque Atual *</Form.Label>
-                                    <Form.Control 
-                                        type="number" 
-                                        value={formData.estoque}
-                                        onChange={(e) => setFormData({...formData, estoque: e.target.value})}
-                                        min="0"
-                                        isInvalid={!!formErrors.estoque}
-                                    />
-                                    <Form.Control.Feedback type="invalid">
-                                        {formErrors.estoque}
-                                    </Form.Control.Feedback>
+                                    <Form.Control type="number" name="estoque" value={formData.estoque} onChange={handleFormChange} min="0" isInvalid={!!formErrors.estoque}/>
+                                    <Form.Control.Feedback type="invalid">{formErrors.estoque}</Form.Control.Feedback>
                                 </Form.Group>
                             </Col>
                             <Col md={4}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Custo Médio (R$) *</Form.Label>
-                                    <Form.Control 
-                                        type="number" 
-                                        step="0.01"
-                                        value={formData.custoMedio}
-                                        onChange={(e) => setFormData({...formData, custoMedio: e.target.value})}
-                                        min="0"
-                                        isInvalid={!!formErrors.custoMedio}
-                                    />
-                                    <Form.Control.Feedback type="invalid">
-                                        {formErrors.custoMedio}
-                                    </Form.Control.Feedback>
+                                    <Form.Control type="number" step="0.01" name="custoMedio" value={formData.custoMedio} onChange={handleFormChange} min="0" isInvalid={!!formErrors.custoMedio}/>
+                                    <Form.Control.Feedback type="invalid">{formErrors.custoMedio}</Form.Control.Feedback>
                                 </Form.Group>
                             </Col>
-                            <Col md={4}>
+                             <Col md={4}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Preço de Venda (R$) *</Form.Label>
-                                    <Form.Control 
-                                        type="number" 
-                                        step="0.01"
-                                        value={formData.precoVenda}
-                                        onChange={(e) => setFormData({...formData, precoVenda: e.target.value})}
-                                        min="0"
-                                        isInvalid={!!formErrors.precoVenda}
-                                    />
-                                    <Form.Control.Feedback type="invalid">
-                                        {formErrors.precoVenda}
-                                    </Form.Control.Feedback>
+                                    <Form.Control type="number" step="0.01" name="precoVenda" value={formData.precoVenda} onChange={handleFormChange} min="0" isInvalid={!!formErrors.precoVenda}/>
+                                    <Form.Control.Feedback type="invalid">{formErrors.precoVenda}</Form.Control.Feedback>
                                 </Form.Group>
                             </Col>
                         </Row>
-
                         <Row>
                             <Col md={6}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Data de Validade</Form.Label>
-                                    <Form.Control 
-                                        type="date" 
-                                        value={formData.dataValidade}
-                                        onChange={(e) => setFormData({...formData, dataValidade: e.target.value})}
-                                    />
-                                    <Form.Text className="text-muted">
-                                        Opcional - deixe em branco se não aplicável
-                                    </Form.Text>
+                                    <Form.Control type="date" name="dataValidade" value={formData.dataValidade} onChange={handleFormChange}/>
+                                    <Form.Text className="text-muted">Opcional - deixe em branco se não aplicável</Form.Text>
                                 </Form.Group>
                             </Col>
                             <Col md={6}>
-                                <Form.Group className="mb-3">
+                                 <Form.Group className="mb-3">
                                     <Form.Label>Margem de Lucro</Form.Label>
-                                    <Form.Control 
-                                        type="text" 
-                                        value={`${calculateMargin()}%`}
-                                        disabled
-                                    />
-                                    <Form.Text className="text-muted">
-                                        Calculado automaticamente
-                                    </Form.Text>
+                                    <Form.Control type="text" value={`${calculateMargin()}%`} disabled/>
+                                    <Form.Text className="text-muted">Calculado automaticamente</Form.Text>
                                 </Form.Group>
                             </Col>
                         </Row>
-
                         <Alert variant="info" className="mb-0">
-                            <small>
-                                <strong>Dica:</strong> A margem de lucro é calculada como: 
-                                ((Preço de Venda - Custo) / Custo) × 100
-                            </small>
+                            <small><strong>Dica:</strong> A margem de lucro é calculada como: ((Preço de Venda - Custo) / Custo) × 100</small>
                         </Alert>
                     </Form>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowModal(false)}>
-                        Cancelar
-                    </Button>
-                    <Button variant="primary" onClick={handleSave}>
-                        {modalMode === 'create' ? 'Cadastrar' : 'Salvar Alterações'}
-                    </Button>
+                    <Button variant="secondary" onClick={() => setShowModal(false)}>Cancelar</Button>
+                    <Button variant="primary" onClick={handleSave}>{modalMode === 'create' ? 'Cadastrar' : 'Salvar Alterações'}</Button>
                 </Modal.Footer>
             </Modal>
 
@@ -643,22 +595,16 @@ const Inventory = () => {
                     <Alert variant="danger" className="mb-3">
                         <strong>⚠️ Atenção!</strong> Esta ação não pode ser desfeita.
                     </Alert>
-                    {selectedItem && (
-                        <p>
-                            Você está prestes a excluir o produto:<br/>
-                            <strong>{selectedItem.nome}</strong> (SKU: {selectedItem.sku})
-                        </p>
+                    {selectedItem ? (
+                        <p>Você está prestes a excluir o produto:<br/><strong>{selectedItem.nome}</strong> (SKU: {selectedItem.sku})</p>
+                    ) : (
+                         <p>Você está prestes a excluir <strong>{selectedProducts.size}</strong> produto(s) selecionado(s).</p>
                     )}
                     <p className="mb-0">Tem certeza que deseja continuar?</p>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
-                        Cancelar
-                    </Button>
-                    <Button variant="danger" onClick={confirmDelete}>
-                        <Trash className="me-2" />
-                        Sim, Excluir
-                    </Button>
+                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancelar</Button>
+                    <Button variant="danger" onClick={confirmDelete}><Trash className="me-2" />Sim, Excluir</Button>
                 </Modal.Footer>
             </Modal>
         </Container>
