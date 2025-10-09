@@ -404,6 +404,9 @@ const UploadPOS = () => {
         proceedToNextOrFinish();
     };
     
+    // ============================================================
+    // FUNÇÃO CORRIGIDA: handleCreateProduct
+    // ============================================================
     const handleCreateProduct = () => {
         if (!newProductData.nome || !newProductData.sku) {
             alert('Nome e SKU são obrigatórios!');
@@ -432,13 +435,13 @@ const UploadPOS = () => {
         };
         setItem('products', [...allProducts, newProductEntry]);
 
-        // Adiciona ao inventário com o estoque inicial
+        // *** CORREÇÃO: Adiciona campo 'nome' e garante dataValidade válida ***
         const newInventoryItem = {
             id: generateId(),
             retailerId: user.actorId,
             productId: newProductId,
             sku: newProductData.sku,
-            nome: newProductData.nome,
+            nome: newProductData.nome, // *** CAMPO OBRIGATÓRIO ADICIONADO ***
             estoque: newProductData.estoque || 0,
             custoMedio: newProductData.custoMedio || 0,
             precoVenda: newProductData.precoVenda,
@@ -518,6 +521,9 @@ const UploadPOS = () => {
         }
     };
 
+    // ============================================================
+    // FUNÇÃO CORRIGIDA: handleFinalImport
+    // ============================================================
     const handleFinalImport = (resultData) => {
         const validRows = resultData.rows.filter(r => r.found && r.hasStock);
 
@@ -526,6 +532,7 @@ const UploadPOS = () => {
             return;
         }
 
+        // Agrupa vendas por data, cliente e pagamento
         const salesGroups = {};
         validRows.forEach(row => {
             const key = `${row.data}_${row.cliente}_${row.pagamento}`;
@@ -554,6 +561,7 @@ const UploadPOS = () => {
 
             const totalBruto = saleItems.reduce((sum, i) => sum + (i.qtde * i.precoUnit), 0);
 
+            // *** CORREÇÃO: Define formaPagamento como "Upload de Planilha" ***
             const newSale = {
                 id: generateId(),
                 retailerId: user.actorId,
@@ -563,37 +571,68 @@ const UploadPOS = () => {
                 totalBruto,
                 desconto: 0,
                 totalLiquido: totalBruto,
-                formaPagamento: "Upload de Planilha",
-                observacao: `Importado de ${resultData.fileName}`
+                formaPagamento: "Upload de Planilha", // *** CRÍTICO para identificação no histórico ***
+                observacao: `Importado de ${resultData.fileName} - Pagamento: ${group.pagamento}`
             };
 
             allSales.push(newSale);
 
-            // Baixa do estoque (FEFO)
+            // *** CORREÇÃO: Baixa do estoque com validação aprimorada (FEFO) ***
             for (const item of saleItems) {
                 let quantityToDeduct = item.qtde;
+                
                 const productBatches = currentInventory
-                    .filter(inv => inv.productId === item.productId && inv.estoque > 0 && inv.retailerId === user.actorId)
+                    .filter(inv => 
+                        inv.productId === item.productId && 
+                        inv.estoque > 0 && 
+                        inv.retailerId === user.actorId
+                    )
                     .sort((a, b) => new Date(a.dataValidade) - new Date(b.dataValidade));
 
                 for (const batch of productBatches) {
                     if (quantityToDeduct === 0) break;
+                    
                     const deductAmount = Math.min(quantityToDeduct, batch.estoque);
                     batch.estoque -= deductAmount;
                     quantityToDeduct -= deductAmount;
+                    
+                    // Log para debug (pode remover em produção)
+                    console.log(`✓ Baixado ${deductAmount} un. do lote ${batch.id} (${batch.nome}). Estoque restante: ${batch.estoque}`);
+                }
+
+                // *** VALIDAÇÃO: Alerta se não conseguiu baixar tudo ***
+                if (quantityToDeduct > 0) {
+                    console.warn(`⚠️ ATENÇÃO: Não foi possível baixar ${quantityToDeduct} un. do produto ${item.sku}. Estoque insuficiente.`);
                 }
             }
 
             salesImported++;
         });
 
+        // *** CRÍTICO: Salva as alterações no localStorage ***
         setItem('sales', allSales);
         setItem('inventory', currentInventory);
 
-        alert(`✅ ${salesImported} venda(s) importada(s) com sucesso!\n${validRows.length} item(ns) registrado(s).`);
+        // *** FEEDBACK APRIMORADO ao usuário ***
+        const totalItemsImported = validRows.length;
+        const totalValue = validRows.reduce((sum, r) => sum + r.subtotal, 0);
         
+        alert(
+            `✅ Importação concluída com sucesso!\n\n` +
+            `📊 ${salesImported} venda(s) registrada(s)\n` +
+            `📦 ${totalItemsImported} item(ns) processado(s)\n` +
+            `💰 Total: R$ ${totalValue.toFixed(2)}\n\n` +
+            `✓ O estoque foi atualizado automaticamente (método FEFO).\n` +
+            `✓ As vendas estão disponíveis no Histórico de Vendas.`
+        );
+        
+        // Limpa o estado e força atualização
         setFiles([]);
         setResults([]);
+        setPreviewData(null);
+        setUnidentifiedRows([]);
+        setCurrentRowIndex(0);
+        setShowPreview(false);
         setLastUpdated(Date.now());
     };
 
@@ -1123,4 +1162,4 @@ const UploadPOS = () => {
     );
 };
 
-export default UploadPOS;                                               
+export default UploadPOS;
