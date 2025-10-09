@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
-import { getInventoryByRetailer, getClientsByRetailer } from '../../../state/selectors';
+import { getInventoryByRetailer, getClientsByRetailer, getActorsByType } from '../../../state/selectors';
 import { setItem, getItem } from '../../../state/storage';
 import { generateId } from '../../../utils/ids';
 import { Container, Row, Col, Card, Button, Table, Alert, Badge, Form, Modal, ProgressBar, ListGroup } from 'react-bootstrap';
@@ -17,6 +17,14 @@ const UploadPOS = () => {
     const [previewData, setPreviewData] = useState(null);
     const [lastUpdated, setLastUpdated] = useState(Date.now());
 
+    // Estados para o novo modal de vincular/criar produto
+    const [showLinkModal, setShowLinkModal] = useState(false);
+    const [unidentifiedRows, setUnidentifiedRows] = useState([]);
+    const [currentRowToLink, setCurrentRowToLink] = useState(null);
+    const [linkAction, setLinkAction] = useState('link'); // 'link' ou 'create'
+    const [selectedLinkProduct, setSelectedLinkProduct] = useState('');
+    const [newProductData, setNewProductData] = useState({ nome: '', sku: '', categoria: '', precoVenda: 0, industryId: '' });
+
     const inventory = useMemo(() => {
         if (!user) return [];
         return getInventoryByRetailer(user.actorId);
@@ -26,6 +34,8 @@ const UploadPOS = () => {
         if (!user) return [];
         return getClientsByRetailer(user.actorId);
     }, [user, lastUpdated]);
+    
+    const industries = useMemo(() => getActorsByType('industry'), []);
 
     // Normaliza texto para comparação
     const normalizeText = (text) => {
@@ -40,27 +50,10 @@ const UploadPOS = () => {
     };
 
     // Busca produto por SKU ou nome
-    const findProduct = useCallback((sku, nome) => {
-        if (!sku && !nome) return null;
-
-        if (sku) {
-            const normalizedSku = normalizeText(sku);
-            const bySku = inventory.find(item => 
-                normalizeText(item.sku) === normalizedSku
-            );
-            if (bySku) return bySku;
-        }
-
-        if (nome) {
-            const normalizedNome = normalizeText(nome);
-            const byName = inventory.find(item => 
-                normalizeText(item.nome).includes(normalizedNome) ||
-                normalizedNome.includes(normalizeText(item.nome))
-            );
-            if (byName) return byName;
-        }
-
-        return null;
+    const findProduct = useCallback((sku) => {
+        if (!sku) return null;
+        const normalizedSku = normalizeText(sku);
+        return inventory.find(item => normalizeText(item.sku) === normalizedSku);
     }, [inventory]);
 
     // Busca cliente
@@ -169,6 +162,10 @@ const UploadPOS = () => {
             pagamentoPatterns.some(p => normalizedHeaders[i].includes(p))
         );
 
+        if (!columnMap.sku) {
+            return { error: "A coluna 'SKU' é obrigatória na planilha." };
+        }
+
         return columnMap;
     }, []);
 
@@ -179,7 +176,7 @@ const UploadPOS = () => {
         const normalized = cleaned.replace(',', '.');
         return parseFloat(normalized) || 0;
     };
-
+    
     // Processa dados extraídos
     const processExtractedData = useCallback((rawData, fileName) => {
         if (!rawData || rawData.length === 0) {
@@ -192,6 +189,10 @@ const UploadPOS = () => {
 
         const headers = Object.keys(rawData[0]);
         const columnMap = identifyColumns(headers);
+
+        if (columnMap.error) {
+            return { fileName, success: false, error: columnMap.error };
+        }
 
         const processedRows = [];
         let foundCount = 0;
@@ -209,9 +210,12 @@ const UploadPOS = () => {
             const clienteInfo = row[columnMap.cliente] || '';
             const pagamentoInfo = row[columnMap.pagamento] || 'Não informado';
 
-            if (!sku && !nome) continue;
+            if (!sku) {
+                warnings.push(`Linha ${i + 2}: SKU não informado. Esta linha será ignorada.`);
+                continue;
+            }
 
-            const product = findProduct(sku, nome);
+            const product = findProduct(sku);
 
             if (product) {
                 const preco = precoInfo ? parseMoneyValue(precoInfo) : product.avgPrice;
@@ -239,7 +243,7 @@ const UploadPOS = () => {
             } else {
                 processedRows.push({
                     linha: i + 2,
-                    sku: sku || 'N/A',
+                    sku: sku,
                     nome: nome || 'Produto não identificado',
                     quantidade,
                     precoUnitario: parseMoneyValue(precoInfo),
@@ -252,7 +256,6 @@ const UploadPOS = () => {
                     hasStock: false
                 });
                 notFoundCount++;
-                warnings.push(`Linha ${i + 2}: Produto "${nome || sku}" não encontrado no estoque`);
             }
         }
 
@@ -269,10 +272,11 @@ const UploadPOS = () => {
             columnMap,
             rows: processedRows,
             warnings,
-            success: foundCount > 0,
-            canImport: validRows.length > 0
+            success: true,
+            canImport: true, 
         };
     }, [findProduct, findClient, identifyColumns]);
+
 
     const handleFileSelect = (e) => {
         const selectedFiles = Array.from(e.target.files);
@@ -323,8 +327,23 @@ const UploadPOS = () => {
         setPreviewData(data);
         setShowPreview(true);
     };
+    
+    const handleImportInitiation = (resultData) => {
+        setPreviewData(resultData); // Salva os dados do resultado para uso posterior
+        const notFoundRows = resultData.rows.filter(r => !r.found);
+        if (notFoundRows.length > 0) {
+            setUnidentifiedRows(notFoundRows);
+            setCurrentRowToLink(notFoundRows[0]);
+            setLinkAction('link');
+            setSelectedLinkProduct('');
+            setNewProductData({ nome: notFoundRows[0].nome, sku: notFoundRows[0].sku, categoria: '', precoVenda: notFoundRows[0].precoUnitario, industryId: '' });
+            setShowLinkModal(true);
+        } else {
+            handleFinalImport(resultData);
+        }
+    };
 
-    const handleImportSales = (resultData) => {
+    const handleFinalImport = (resultData) => {
         const validRows = resultData.rows.filter(r => r.found && r.hasStock);
 
         if (validRows.length === 0) {
@@ -363,13 +382,13 @@ const UploadPOS = () => {
             const newSale = {
                 id: generateId(),
                 retailerId: user.actorId,
-                dataISO: group.data,
+                dataISO: new Date(group.data).toISOString(),
                 clienteId: group.cliente,
                 itens: saleItems,
                 totalBruto,
                 desconto: 0,
                 totalLiquido: totalBruto,
-                formaPagamento: group.pagamento,
+                formaPagamento: "Upload de Planilha",
                 observacao: `Importado de ${resultData.fileName}`
             };
 
@@ -402,12 +421,126 @@ const UploadPOS = () => {
         setLastUpdated(Date.now());
     };
 
+    const handleLinkProduct = () => {
+        const product = inventory.find(p => p.productId === selectedLinkProduct);
+        if (!product) return;
+    
+        const updatedResults = results.map(res => {
+            if (res.fileName === previewData.fileName) {
+                const updatedRows = res.rows.map(row => {
+                    if (row.linha === currentRowToLink.linha) {
+                        return {
+                            ...row,
+                            found: true,
+                            productId: product.productId,
+                            sku: product.sku,
+                            nome: product.nome,
+                            hasStock: product.totalStock >= row.quantidade,
+                        };
+                    }
+                    return row;
+                });
+                return { ...res, rows: updatedRows, produtosNaoEncontrados: res.produtosNaoEncontrados - 1, produtosEncontrados: res.produtosEncontrados + 1 };
+            }
+            return res;
+        });
+        setResults(updatedResults);
+        setPreviewData(prev => ({...prev, rows: updatedResults.find(r => r.fileName === prev.fileName).rows}));
+    
+        const remaining = unidentifiedRows.filter(r => r.linha !== currentRowToLink.linha);
+        setUnidentifiedRows(remaining);
+    
+        if (remaining.length > 0) {
+            const nextRow = remaining[0];
+            setCurrentRowToLink(nextRow);
+            setNewProductData({ nome: nextRow.nome, sku: nextRow.sku, categoria: '', precoVenda: nextRow.precoUnitario, industryId: '' });
+            setSelectedLinkProduct('');
+            setLinkAction('link');
+        } else {
+            setShowLinkModal(false);
+            const finalResultData = updatedResults.find(r => r.fileName === previewData.fileName);
+            handleFinalImport(finalResultData);
+        }
+    };
+    
+    const handleCreateProduct = () => {
+        const allProducts = getItem('products') || [];
+        const allInventory = getItem('inventory') || [];
+        const selectedIndustry = industries.find(i => i.id === newProductData.industryId);
+
+        const newProductId = generateId();
+        const newProductEntry = {
+            id: newProductId,
+            sku: newProductData.sku,
+            nome: newProductData.nome,
+            categoria: newProductData.categoria,
+            subcategoria: 'Geral',
+            marca: selectedIndustry?.nomeFantasia || 'Marca Própria',
+            industryId: newProductData.industryId || 'manual',
+            precoSugerido: newProductData.precoVenda,
+        };
+        setItem('products', [...allProducts, newProductEntry]);
+
+        const newInventoryItem = {
+             id: generateId(),
+             retailerId: user.actorId,
+             productId: newProductId,
+             sku: newProductData.sku,
+             nome: newProductData.nome,
+             estoque: 0, 
+             custoMedio: 0,
+             precoVenda: newProductData.precoVenda,
+             dataValidade: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+        };
+        setItem('inventory', [...allInventory, newInventoryItem]);
+        
+        setLastUpdated(Date.now());
+
+        const updatedResults = results.map(res => {
+            if (res.fileName === previewData.fileName) {
+                 const updatedRows = res.rows.map(row => {
+                    if (row.linha === currentRowToLink.linha) {
+                        return {
+                            ...row,
+                            found: true,
+                            productId: newProductId,
+                            sku: newProductData.sku,
+                            nome: newProductData.nome,
+                            hasStock: false, 
+                        };
+                    }
+                    return row;
+                });
+                 return { ...res, rows: updatedRows, produtosNaoEncontrados: res.produtosNaoEncontrados - 1, produtosEncontrados: res.produtosEncontrados + 1 };
+            }
+            return res;
+        });
+        setResults(updatedResults);
+         setPreviewData(prev => ({...prev, rows: updatedResults.find(r => r.fileName === prev.fileName).rows}));
+        
+        const remaining = unidentifiedRows.filter(r => r.linha !== currentRowToLink.linha);
+        setUnidentifiedRows(remaining);
+
+         if (remaining.length > 0) {
+            const nextRow = remaining[0];
+            setCurrentRowToLink(nextRow);
+            setNewProductData({ nome: nextRow.nome, sku: nextRow.sku, categoria: '', precoVenda: nextRow.precoUnitario, industryId: '' });
+            setSelectedLinkProduct('');
+            setLinkAction('link');
+        } else {
+            setShowLinkModal(false);
+            const finalResultData = updatedResults.find(r => r.fileName === previewData.fileName);
+            handleFinalImport(finalResultData);
+        }
+    };
+
+
     const downloadTemplate = () => {
         const template = [
             ['SKU', 'Produto', 'Quantidade', 'Preço', 'Data', 'Cliente', 'Forma de Pagamento'],
             ['BEB0001', 'Refrigerante Boreal Cola 2L', '2', '10.50', '2025-10-08', 'João Silva', 'Dinheiro'],
             ['ALI0001', 'Biscoito DoceVida Chocolate', '5', '4.50', '2025-10-08', 'Consumidor Final', 'PIX'],
-            ['', 'Macarrão DoceVida Espaguete', '3', '', '2025-10-08', '', 'Cartão de Crédito']
+            ['PROD-XYZ', 'Produto Novo Exemplo', '3', '15.00', '2025-10-08', '', 'Cartão de Crédito']
         ];
 
         const ws = XLSX.utils.aoa_to_sheet(template);
@@ -530,10 +663,10 @@ const UploadPOS = () => {
                                         <div className="d-flex justify-content-between align-items-start">
                                             <div className="flex-grow-1">
                                                 <div className="d-flex align-items-center mb-3">
-                                                    {result.success ? (
-                                                        <CheckCircleFill className="text-success me-2" size={24} />
-                                                    ) : (
+                                                    {!result.success ? (
                                                         <XCircleFill className="text-danger me-2" size={24} />
+                                                    ) : (
+                                                        <CheckCircleFill className="text-success me-2" size={24} />
                                                     )}
                                                     <div>
                                                         <strong className="d-block">{result.fileName}</strong>
@@ -566,7 +699,7 @@ const UploadPOS = () => {
                                                             </Col>
                                                             <Col xs={6} md={3}>
                                                                 <Card className="border-0 bg-primary bg-opacity-10 text-center p-2">
-                                                                    <small className="text-muted">Valor Total</small>
+                                                                    <small className="text-muted">Valor Válido</small>
                                                                     <strong className="h5 mb-0 text-primary">R$ {result.valorTotal.toFixed(2)}</strong>
                                                                 </Card>
                                                             </Col>
@@ -607,7 +740,7 @@ const UploadPOS = () => {
                                                     <Button
                                                         variant="success"
                                                         size="sm"
-                                                        onClick={() => handleImportSales(result)}
+                                                        onClick={() => handleImportInitiation(result)}
                                                         disabled={!result.canImport}
                                                     >
                                                         <CheckCircleFill className="me-1" />
@@ -633,11 +766,11 @@ const UploadPOS = () => {
                                 </div>
                             </div>
                             <ol className="small ps-3 mb-0">
-                                <li className="mb-2">Prepare sua planilha com colunas como: <strong>SKU</strong>, <strong>Produto</strong>, <strong>Quantidade</strong>, <strong>Preço</strong></li>
-                                <li className="mb-2">Faça o upload do arquivo (CSV ou Excel)</li>
-                                <li className="mb-2">O sistema identifica automaticamente os produtos</li>
-                                <li className="mb-2">Revise os resultados na pré-visualização</li>
-                                <li>Importe as vendas e o estoque é atualizado automaticamente</li>
+                                <li className="mb-2"><strong>Obrigatório:</strong> Sua planilha precisa ter uma coluna <strong>SKU</strong>.</li>
+                                <li className="mb-2">Faça o upload do arquivo (CSV ou Excel).</li>
+                                <li className="mb-2">O sistema identifica os produtos pelo SKU.</li>
+                                <li className="mb-2">Se um SKU não for encontrado, você poderá vinculá-lo a um produto existente ou criar um novo.</li>
+                                <li>Revise os resultados e importe as vendas. O estoque é atualizado automaticamente.</li>
                             </ol>
                         </Card.Body>
                     </Card>
@@ -648,46 +781,10 @@ const UploadPOS = () => {
                                 💡 Dicas Importantes
                             </Card.Title>
                             <ul className="small mb-0 ps-3">
-                                <li className="mb-2">Use o <strong>SKU</strong> para garantir maior precisão</li>
-                                <li className="mb-2">Se o preço não for informado, usamos o preço médio do estoque</li>
-                                <li className="mb-2">Produtos não encontrados aparecem nos avisos</li>
-                                <li className="mb-2">Vendas são agrupadas automaticamente por data e cliente</li>
-                                <li>O estoque é baixado usando o método FIFO (primeiro a vencer, primeiro a sair)</li>
+                                <li className="mb-2">Se o preço não for informado, usamos o preço médio do estoque.</li>
+                                <li className="mb-2">Vendas são agrupadas por data, cliente e forma de pagamento.</li>
+                                <li>O estoque é baixado usando o método FEFO (primeiro a vencer, primeiro a sair).</li>
                             </ul>
-                        </Card.Body>
-                    </Card>
-
-                    <Card className="shadow-sm bg-info bg-opacity-10 border-info">
-                        <Card.Body>
-                            <Card.Title className="h6 text-info">
-                                📋 Colunas Reconhecidas
-                            </Card.Title>
-                            <div className="small">
-                                <div className="mb-2">
-                                    <Badge bg="info" className="me-2">SKU</Badge>
-                                    <small>codigo, cod, ref, referencia</small>
-                                </div>
-                                <div className="mb-2">
-                                    <Badge bg="info" className="me-2">Produto</Badge>
-                                    <small>nome, descricao, item</small>
-                                </div>
-                                <div className="mb-2">
-                                    <Badge bg="info" className="me-2">Quantidade</Badge>
-                                    <small>qtde, qtd, unidade, qty</small>
-                                </div>
-                                <div className="mb-2">
-                                    <Badge bg="info" className="me-2">Preço</Badge>
-                                    <small>valor, price, vl</small>
-                                </div>
-                                <div className="mb-2">
-                                    <Badge bg="info" className="me-2">Data</Badge>
-                                    <small>date, dia</small>
-                                </div>
-                                <div>
-                                    <Badge bg="info" className="me-2">Cliente</Badge>
-                                    <small>comprador, customer</small>
-                                </div>
-                            </div>
                         </Card.Body>
                     </Card>
                 </Col>
@@ -704,13 +801,13 @@ const UploadPOS = () => {
                     {previewData && (
                         <>
                             <Alert variant="info" className="mb-3">
-                                <strong>Colunas identificadas automaticamente:</strong>
-                                <Row className="mt-2 g-2">
+                                <strong>Colunas identificadas:</strong>
+                                <Row className="mt-2 g-2 small">
                                     {Object.entries(previewData.columnMap).map(([key, value]) => (
                                         value && (
                                             <Col xs={6} md={4} key={key}>
-                                                <Badge bg="info" className="me-1">{key}:</Badge>
-                                                <small>{value}</small>
+                                                <Badge bg="info" className="me-1">{key.toUpperCase()}:</Badge>
+                                                <span>{value}</span>
                                             </Col>
                                         )
                                     ))}
@@ -721,13 +818,13 @@ const UploadPOS = () => {
                                 <Table striped bordered hover size="sm">
                                     <thead className="sticky-top bg-white">
                                         <tr>
-                                            <th style={{ width: '60px' }}>Linha</th>
-                                            <th style={{ width: '60px' }}>Status</th>
-                                            <th style={{ width: '100px' }}>SKU</th>
+                                            <th>Linha</th>
+                                            <th>Status</th>
+                                            <th>SKU</th>
                                             <th>Produto</th>
-                                            <th style={{ width: '80px' }}>Qtd</th>
-                                            <th style={{ width: '100px' }}>Preço Un.</th>
-                                            <th style={{ width: '100px' }}>Subtotal</th>
+                                            <th>Qtd</th>
+                                            <th>Preço Un.</th>
+                                            <th>Subtotal</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -735,15 +832,9 @@ const UploadPOS = () => {
                                             <tr key={index} className={!row.found ? 'table-danger' : (!row.hasStock ? 'table-warning' : '')}>
                                                 <td className="text-center">{row.linha}</td>
                                                 <td className="text-center">
-                                                    {row.found && row.hasStock && (
-                                                        <CheckCircleFill className="text-success" title="OK" />
-                                                    )}
-                                                    {row.found && !row.hasStock && (
-                                                        <ExclamationTriangleFill className="text-warning" title="Estoque insuficiente" />
-                                                    )}
-                                                    {!row.found && (
-                                                        <XCircleFill className="text-danger" title="Produto não encontrado" />
-                                                    )}
+                                                    {row.found && row.hasStock && <CheckCircleFill className="text-success" title="OK" />}
+                                                    {row.found && !row.hasStock && <ExclamationTriangleFill className="text-warning" title="Estoque insuficiente" />}
+                                                    {!row.found && <XCircleFill className="text-danger" title="Produto não encontrado" />}
                                                 </td>
                                                 <td><small className="font-monospace">{row.sku}</small></td>
                                                 <td><small>{row.nome}</small></td>
@@ -753,71 +844,87 @@ const UploadPOS = () => {
                                             </tr>
                                         ))}
                                     </tbody>
-                                    <tfoot className="table-light">
-                                        <tr>
-                                            <th colSpan="6" className="text-end">Total:</th>
-                                            <th className="text-end">R$ {previewData.valorTotal.toFixed(2)}</th>
-                                        </tr>
-                                    </tfoot>
                                 </Table>
-                            </div>
-
-                            <div className="mt-3">
-                                <Alert variant="secondary" className="mb-0 d-flex align-items-center">
-                                    <InfoCircleFill className="me-2 flex-shrink-0" />
-                                    <div className="small">
-                                        <strong>Legenda:</strong>
-                                        <span className="ms-3">
-                                            <CheckCircleFill className="text-success me-1" /> Produto OK
-                                        </span>
-                                        <span className="ms-3">
-                                            <ExclamationTriangleFill className="text-warning me-1" /> Estoque baixo
-                                        </span>
-                                        <span className="ms-3">
-                                            <XCircleFill className="text-danger me-1" /> Não encontrado
-                                        </span>
-                                    </div>
-                                </Alert>
                             </div>
                         </>
                     )}
                 </Modal.Body>
+            </Modal>
+            
+            <Modal show={showLinkModal} onHide={() => setShowLinkModal(false)} centered backdrop="static">
+                <Modal.Header closeButton>
+                    <Modal.Title>Resolver Produto Não Identificado</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {currentRowToLink && <>
+                        <Alert variant='warning'>O produto da linha <strong>{currentRowToLink.linha}</strong> (SKU: <strong>{currentRowToLink.sku}</strong>) não foi encontrado.</Alert>
+                        <p>Resolvendo {unidentifiedRows.indexOf(currentRowToLink) + 1} de {unidentifiedRows.length}.</p>
+                        
+                        <Form.Group className="mb-3">
+                            <Form.Check type="radio" label="Vincular a um produto existente" name="linkAction" checked={linkAction === 'link'} onChange={() => setLinkAction('link')} />
+                            <Form.Check type="radio" label="Cadastrar novo produto" name="linkAction" checked={linkAction === 'create'} onChange={() => setLinkAction('create')} />
+                        </Form.Group>
+
+                        {linkAction === 'link' && (
+                            <Form.Group>
+                                <Form.Label>Selecione o produto correto:</Form.Label>
+                                <Form.Select value={selectedLinkProduct} onChange={e => setSelectedLinkProduct(e.target.value)}>
+                                    <option value="">Selecione...</option>
+                                    {inventory.map(item => (
+                                        <option key={item.productId} value={item.productId}>{item.nome} ({item.sku})</option>
+                                    ))}
+                                </Form.Select>
+                            </Form.Group>
+                        )}
+
+                        {linkAction === 'create' && (
+                            <>
+                                <Row>
+                                    <Col md={8}>
+                                        <Form.Group className="mb-2">
+                                            <Form.Label>Nome do Produto</Form.Label>
+                                            <Form.Control type="text" value={newProductData.nome} onChange={e => setNewProductData({...newProductData, nome: e.target.value})} />
+                                        </Form.Group>
+                                    </Col>
+                                    <Col md={4}>
+                                        <Form.Group className="mb-2">
+                                            <Form.Label>SKU</Form.Label>
+                                            <Form.Control type="text" value={newProductData.sku} readOnly disabled />
+                                        </Form.Group>
+                                    </Col>
+                                </Row>
+                                <Form.Group className="mb-2">
+                                    <Form.Label>Fabricante (Indústria)</Form.Label>
+                                    <Form.Select value={newProductData.industryId} onChange={e => setNewProductData({...newProductData, industryId: e.target.value})}>
+                                        <option value="">Selecione...</option>
+                                        {industries.map(ind => <option key={ind.id} value={ind.id}>{ind.nomeFantasia}</option>)}
+                                    </Form.Select>
+                                </Form.Group>
+                                <Row>
+                                    <Col>
+                                        <Form.Group className="mb-2">
+                                            <Form.Label>Categoria</Form.Label>
+                                            <Form.Control type="text" value={newProductData.categoria} onChange={e => setNewProductData({...newProductData, categoria: e.target.value})} />
+                                        </Form.Group>
+                                    </Col>
+                                    <Col>
+                                        <Form.Group>
+                                            <Form.Label>Preço de Venda</Form.Label>
+                                            <Form.Control type="number" value={newProductData.precoVenda} onChange={e => setNewProductData({...newProductData, precoVenda: parseFloat(e.target.value)})} />
+                                        </Form.Group>
+                                    </Col>
+                                </Row>
+                            </>
+                        )}
+                    </>}
+                </Modal.Body>
                 <Modal.Footer>
-                    <div className="d-flex justify-content-between w-100 align-items-center">
-                        <div className="text-muted small">
-                            {previewData?.canImport ? (
-                                <span className="text-success">
-                                    <CheckCircleFill className="me-1" />
-                                    Pronto para importar {previewData.rows.filter(r => r.found && r.hasStock).length} produto(s)
-                                </span>
-                            ) : (
-                                <span className="text-danger">
-                                    <XCircleFill className="me-1" />
-                                    Nenhum produto válido para importar
-                                </span>
-                            )}
-                        </div>
-                        <div>
-                            <Button variant="secondary" onClick={() => setShowPreview(false)}>
-                                Fechar
-                            </Button>
-                            {previewData?.canImport && (
-                                <Button 
-                                    variant="success" 
-                                    className="ms-2"
-                                    onClick={() => {
-                                        handleImportSales(previewData);
-                                        setShowPreview(false);
-                                    }}
-                                >
-                                    <CheckCircleFill className="me-2" />
-                                    Importar Vendas
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <Button variant="secondary" onClick={() => setShowLinkModal(false)}>Cancelar Importação</Button>
+                    {linkAction === 'link' && <Button variant="primary" onClick={handleLinkProduct} disabled={!selectedLinkProduct}>Vincular e Continuar</Button>}
+                    {linkAction === 'create' && <Button variant="success" onClick={handleCreateProduct} disabled={!newProductData.nome || !newProductData.sku}>Criar e Continuar</Button>}
                 </Modal.Footer>
             </Modal>
+
         </Container>
     );
 };
