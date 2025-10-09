@@ -17,13 +17,21 @@ const UploadPOS = () => {
     const [previewData, setPreviewData] = useState(null);
     const [lastUpdated, setLastUpdated] = useState(Date.now());
 
-    // Estados para o novo modal de vincular/criar produto
+    // Estados para o modal de vincular/criar produto
     const [showLinkModal, setShowLinkModal] = useState(false);
     const [unidentifiedRows, setUnidentifiedRows] = useState([]);
-    const [currentRowToLink, setCurrentRowToLink] = useState(null);
-    const [linkAction, setLinkAction] = useState('link'); // 'link' ou 'create'
+    const [currentRowIndex, setCurrentRowIndex] = useState(0);
+    const [linkAction, setLinkAction] = useState('link');
     const [selectedLinkProduct, setSelectedLinkProduct] = useState('');
-    const [newProductData, setNewProductData] = useState({ nome: '', sku: '', categoria: '', precoVenda: 0, industryId: '' });
+    const [newProductData, setNewProductData] = useState({ 
+        nome: '', 
+        sku: '', 
+        categoria: 'Geral', 
+        precoVenda: 0, 
+        industryId: '',
+        custoMedio: 0,
+        estoque: 0
+    });
 
     const inventory = useMemo(() => {
         if (!user) return [];
@@ -37,7 +45,6 @@ const UploadPOS = () => {
     
     const industries = useMemo(() => getActorsByType('industry'), []);
 
-    // Normaliza texto para comparação
     const normalizeText = (text) => {
         if (!text) return '';
         return text
@@ -49,14 +56,12 @@ const UploadPOS = () => {
             .replace(/\s+/g, ' ');
     };
 
-    // Busca produto por SKU ou nome
     const findProduct = useCallback((sku) => {
         if (!sku) return null;
         const normalizedSku = normalizeText(sku);
         return inventory.find(item => normalizeText(item.sku) === normalizedSku);
     }, [inventory]);
 
-    // Busca cliente
     const findClient = useCallback((clienteInfo) => {
         if (!clienteInfo || !user) return 'consumidor_final_' + user.actorId;
         
@@ -74,7 +79,6 @@ const UploadPOS = () => {
         return client?.id || 'consumidor_final_' + user.actorId;
     }, [clients, user]);
 
-    // Processa CSV
     const processCSV = useCallback((file) => {
         return new Promise((resolve) => {
             Papa.parse(file, {
@@ -87,7 +91,6 @@ const UploadPOS = () => {
         });
     }, []);
 
-    // Processa Excel
     const processExcel = useCallback((file) => {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -113,7 +116,6 @@ const UploadPOS = () => {
         });
     }, []);
 
-    // Identifica colunas
     const identifyColumns = useCallback((headers) => {
         const normalizedHeaders = headers.map(h => normalizeText(h));
         
@@ -169,7 +171,6 @@ const UploadPOS = () => {
         return columnMap;
     }, []);
 
-    // Converte valor monetário
     const parseMoneyValue = (value) => {
         if (!value) return 0;
         const cleaned = value.toString().replace(/[^\d,.-]/g, '');
@@ -177,7 +178,6 @@ const UploadPOS = () => {
         return parseFloat(normalized) || 0;
     };
     
-    // Processa dados extraídos
     const processExtractedData = useCallback((rawData, fileName) => {
         if (!rawData || rawData.length === 0) {
             return {
@@ -277,7 +277,6 @@ const UploadPOS = () => {
         };
     }, [findProduct, findClient, identifyColumns]);
 
-
     const handleFileSelect = (e) => {
         const selectedFiles = Array.from(e.target.files);
         const validFiles = selectedFiles.filter(file => {
@@ -329,17 +328,193 @@ const UploadPOS = () => {
     };
     
     const handleImportInitiation = (resultData) => {
-        setPreviewData(resultData); // Salva os dados do resultado para uso posterior
+        setPreviewData(resultData);
         const notFoundRows = resultData.rows.filter(r => !r.found);
+        
         if (notFoundRows.length > 0) {
             setUnidentifiedRows(notFoundRows);
-            setCurrentRowToLink(notFoundRows[0]);
+            setCurrentRowIndex(0);
+            const firstRow = notFoundRows[0];
             setLinkAction('link');
             setSelectedLinkProduct('');
-            setNewProductData({ nome: notFoundRows[0].nome, sku: notFoundRows[0].sku, categoria: '', precoVenda: notFoundRows[0].precoUnitario, industryId: '' });
+            setNewProductData({ 
+                nome: firstRow.nome, 
+                sku: firstRow.sku, 
+                categoria: 'Geral', 
+                precoVenda: firstRow.precoUnitario || 0,
+                industryId: '',
+                custoMedio: 0,
+                estoque: firstRow.quantidade
+            });
             setShowLinkModal(true);
         } else {
             handleFinalImport(resultData);
+        }
+    };
+
+    const handleLinkProduct = () => {
+        const product = inventory.find(p => p.productId === selectedLinkProduct);
+        if (!product) {
+            alert('Por favor, selecione um produto válido.');
+            return;
+        }
+
+        const currentRow = unidentifiedRows[currentRowIndex];
+        
+        // Atualiza os results com o produto vinculado
+        const updatedResults = results.map(res => {
+            if (res.fileName === previewData.fileName) {
+                const updatedRows = res.rows.map(row => {
+                    if (row.linha === currentRow.linha) {
+                        const preco = row.precoUnitario || product.avgPrice;
+                        return {
+                            ...row,
+                            found: true,
+                            productId: product.productId,
+                            sku: product.sku,
+                            nome: product.nome,
+                            precoUnitario: preco,
+                            subtotal: preco * row.quantidade,
+                            hasStock: product.totalStock >= row.quantidade,
+                        };
+                    }
+                    return row;
+                });
+                
+                const validRows = updatedRows.filter(r => r.found && r.hasStock);
+                const valorTotal = validRows.reduce((sum, r) => sum + r.subtotal, 0);
+                
+                return { 
+                    ...res, 
+                    rows: updatedRows,
+                    produtosNaoEncontrados: res.produtosNaoEncontrados - 1,
+                    produtosEncontrados: res.produtosEncontrados + 1,
+                    valorTotal
+                };
+            }
+            return res;
+        });
+        
+        setResults(updatedResults);
+        
+        // Atualiza o previewData
+        const updatedPreviewData = updatedResults.find(r => r.fileName === previewData.fileName);
+        setPreviewData(updatedPreviewData);
+        
+        proceedToNextOrFinish();
+    };
+    
+    const handleCreateProduct = () => {
+        if (!newProductData.nome || !newProductData.sku) {
+            alert('Nome e SKU são obrigatórios!');
+            return;
+        }
+
+        const currentRow = unidentifiedRows[currentRowIndex];
+        
+        // Cria o novo produto
+        const allProducts = getItem('products') || [];
+        const allInventory = getItem('inventory') || [];
+        const selectedIndustry = industries.find(i => i.id === newProductData.industryId);
+
+        const newProductId = generateId();
+        
+        // Adiciona aos produtos
+        const newProductEntry = {
+            id: newProductId,
+            sku: newProductData.sku,
+            nome: newProductData.nome,
+            categoria: newProductData.categoria,
+            subcategoria: 'Geral',
+            marca: selectedIndustry?.nomeFantasia || 'Marca Própria',
+            industryId: newProductData.industryId || 'manual',
+            precoSugerido: newProductData.precoVenda,
+        };
+        setItem('products', [...allProducts, newProductEntry]);
+
+        // Adiciona ao inventário com o estoque inicial
+        const newInventoryItem = {
+            id: generateId(),
+            retailerId: user.actorId,
+            productId: newProductId,
+            sku: newProductData.sku,
+            nome: newProductData.nome,
+            estoque: newProductData.estoque || 0,
+            custoMedio: newProductData.custoMedio || 0,
+            precoVenda: newProductData.precoVenda,
+            dataValidade: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+        };
+        setItem('inventory', [...allInventory, newInventoryItem]);
+        
+        // Força atualização do inventário
+        setLastUpdated(Date.now());
+
+        // Atualiza os results
+        const updatedResults = results.map(res => {
+            if (res.fileName === previewData.fileName) {
+                const updatedRows = res.rows.map(row => {
+                    if (row.linha === currentRow.linha) {
+                        const preco = newProductData.precoVenda;
+                        return {
+                            ...row,
+                            found: true,
+                            productId: newProductId,
+                            sku: newProductData.sku,
+                            nome: newProductData.nome,
+                            precoUnitario: preco,
+                            subtotal: preco * row.quantidade,
+                            hasStock: newProductData.estoque >= row.quantidade,
+                        };
+                    }
+                    return row;
+                });
+                
+                const validRows = updatedRows.filter(r => r.found && r.hasStock);
+                const valorTotal = validRows.reduce((sum, r) => sum + r.subtotal, 0);
+                
+                return { 
+                    ...res, 
+                    rows: updatedRows,
+                    produtosNaoEncontrados: res.produtosNaoEncontrados - 1,
+                    produtosEncontrados: res.produtosEncontrados + 1,
+                    valorTotal
+                };
+            }
+            return res;
+        });
+        
+        setResults(updatedResults);
+        
+        // Atualiza o previewData
+        const updatedPreviewData = updatedResults.find(r => r.fileName === previewData.fileName);
+        setPreviewData(updatedPreviewData);
+        
+        proceedToNextOrFinish();
+    };
+
+    const proceedToNextOrFinish = () => {
+        const nextIndex = currentRowIndex + 1;
+        
+        if (nextIndex < unidentifiedRows.length) {
+            // Vai para o próximo produto não identificado
+            setCurrentRowIndex(nextIndex);
+            const nextRow = unidentifiedRows[nextIndex];
+            setNewProductData({ 
+                nome: nextRow.nome, 
+                sku: nextRow.sku, 
+                categoria: 'Geral', 
+                precoVenda: nextRow.precoUnitario || 0,
+                industryId: '',
+                custoMedio: 0,
+                estoque: nextRow.quantidade
+            });
+            setSelectedLinkProduct('');
+            setLinkAction('link');
+        } else {
+            // Todos resolvidos, fecha o modal e importa
+            setShowLinkModal(false);
+            const finalResultData = results.find(r => r.fileName === previewData.fileName);
+            handleFinalImport(finalResultData);
         }
     };
 
@@ -347,7 +522,7 @@ const UploadPOS = () => {
         const validRows = resultData.rows.filter(r => r.found && r.hasStock);
 
         if (validRows.length === 0) {
-            alert('Nenhuma venda válida para importar.');
+            alert('Nenhuma venda válida para importar. Verifique o estoque dos produtos.');
             return;
         }
 
@@ -394,10 +569,11 @@ const UploadPOS = () => {
 
             allSales.push(newSale);
 
+            // Baixa do estoque (FEFO)
             for (const item of saleItems) {
                 let quantityToDeduct = item.qtde;
                 const productBatches = currentInventory
-                    .filter(inv => inv.productId === item.productId && inv.estoque > 0)
+                    .filter(inv => inv.productId === item.productId && inv.estoque > 0 && inv.retailerId === user.actorId)
                     .sort((a, b) => new Date(a.dataValidade) - new Date(b.dataValidade));
 
                 for (const batch of productBatches) {
@@ -414,126 +590,12 @@ const UploadPOS = () => {
         setItem('sales', allSales);
         setItem('inventory', currentInventory);
 
-        alert(`✅ ${salesImported} venda(s) importada(s) com sucesso!\n${validRows.length} produto(s) registrado(s).`);
+        alert(`✅ ${salesImported} venda(s) importada(s) com sucesso!\n${validRows.length} item(ns) registrado(s).`);
         
         setFiles([]);
         setResults([]);
         setLastUpdated(Date.now());
     };
-
-    const handleLinkProduct = () => {
-        const product = inventory.find(p => p.productId === selectedLinkProduct);
-        if (!product) return;
-    
-        const updatedResults = results.map(res => {
-            if (res.fileName === previewData.fileName) {
-                const updatedRows = res.rows.map(row => {
-                    if (row.linha === currentRowToLink.linha) {
-                        return {
-                            ...row,
-                            found: true,
-                            productId: product.productId,
-                            sku: product.sku,
-                            nome: product.nome,
-                            hasStock: product.totalStock >= row.quantidade,
-                        };
-                    }
-                    return row;
-                });
-                return { ...res, rows: updatedRows, produtosNaoEncontrados: res.produtosNaoEncontrados - 1, produtosEncontrados: res.produtosEncontrados + 1 };
-            }
-            return res;
-        });
-        setResults(updatedResults);
-        setPreviewData(prev => ({...prev, rows: updatedResults.find(r => r.fileName === prev.fileName).rows}));
-    
-        const remaining = unidentifiedRows.filter(r => r.linha !== currentRowToLink.linha);
-        setUnidentifiedRows(remaining);
-    
-        if (remaining.length > 0) {
-            const nextRow = remaining[0];
-            setCurrentRowToLink(nextRow);
-            setNewProductData({ nome: nextRow.nome, sku: nextRow.sku, categoria: '', precoVenda: nextRow.precoUnitario, industryId: '' });
-            setSelectedLinkProduct('');
-            setLinkAction('link');
-        } else {
-            setShowLinkModal(false);
-            const finalResultData = updatedResults.find(r => r.fileName === previewData.fileName);
-            handleFinalImport(finalResultData);
-        }
-    };
-    
-    const handleCreateProduct = () => {
-        const allProducts = getItem('products') || [];
-        const allInventory = getItem('inventory') || [];
-        const selectedIndustry = industries.find(i => i.id === newProductData.industryId);
-
-        const newProductId = generateId();
-        const newProductEntry = {
-            id: newProductId,
-            sku: newProductData.sku,
-            nome: newProductData.nome,
-            categoria: newProductData.categoria,
-            subcategoria: 'Geral',
-            marca: selectedIndustry?.nomeFantasia || 'Marca Própria',
-            industryId: newProductData.industryId || 'manual',
-            precoSugerido: newProductData.precoVenda,
-        };
-        setItem('products', [...allProducts, newProductEntry]);
-
-        const newInventoryItem = {
-             id: generateId(),
-             retailerId: user.actorId,
-             productId: newProductId,
-             sku: newProductData.sku,
-             nome: newProductData.nome,
-             estoque: 0, 
-             custoMedio: 0,
-             precoVenda: newProductData.precoVenda,
-             dataValidade: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-        };
-        setItem('inventory', [...allInventory, newInventoryItem]);
-        
-        setLastUpdated(Date.now());
-
-        const updatedResults = results.map(res => {
-            if (res.fileName === previewData.fileName) {
-                 const updatedRows = res.rows.map(row => {
-                    if (row.linha === currentRowToLink.linha) {
-                        return {
-                            ...row,
-                            found: true,
-                            productId: newProductId,
-                            sku: newProductData.sku,
-                            nome: newProductData.nome,
-                            hasStock: false, 
-                        };
-                    }
-                    return row;
-                });
-                 return { ...res, rows: updatedRows, produtosNaoEncontrados: res.produtosNaoEncontrados - 1, produtosEncontrados: res.produtosEncontrados + 1 };
-            }
-            return res;
-        });
-        setResults(updatedResults);
-         setPreviewData(prev => ({...prev, rows: updatedResults.find(r => r.fileName === prev.fileName).rows}));
-        
-        const remaining = unidentifiedRows.filter(r => r.linha !== currentRowToLink.linha);
-        setUnidentifiedRows(remaining);
-
-         if (remaining.length > 0) {
-            const nextRow = remaining[0];
-            setCurrentRowToLink(nextRow);
-            setNewProductData({ nome: nextRow.nome, sku: nextRow.sku, categoria: '', precoVenda: nextRow.precoUnitario, industryId: '' });
-            setSelectedLinkProduct('');
-            setLinkAction('link');
-        } else {
-            setShowLinkModal(false);
-            const finalResultData = updatedResults.find(r => r.fileName === previewData.fileName);
-            handleFinalImport(finalResultData);
-        }
-    };
-
 
     const downloadTemplate = () => {
         const template = [
@@ -680,18 +742,6 @@ const UploadPOS = () => {
                                                     <>
                                                         <Row className="mb-3 g-3">
                                                             <Col xs={6} md={3}>
-                                                                <Card className="border-0 bg-light text-center p-2">
-                                                                    <small className="text-muted">Total de Linhas</small>
-                                                                    <strong className="h5 mb-0">{result.totalLinhas}</strong>
-                                                                </Card>
-                                                            </Col>
-                                                            <Col xs={6} md={3}>
-                                                                <Card className="border-0 bg-success bg-opacity-10 text-center p-2">
-                                                                    <small className="text-muted">Encontrados</small>
-                                                                    <strong className="h5 mb-0 text-success">{result.produtosEncontrados}</strong>
-                                                                </Card>
-                                                            </Col>
-                                                            <Col xs={6} md={3}>
                                                                 <Card className="border-0 bg-danger bg-opacity-10 text-center p-2">
                                                                     <small className="text-muted">Não Encontrados</small>
                                                                     <strong className="h5 mb-0 text-danger">{result.produtosNaoEncontrados}</strong>
@@ -766,10 +816,10 @@ const UploadPOS = () => {
                                 </div>
                             </div>
                             <ol className="small ps-3 mb-0">
-                                <li className="mb-2"><strong>Obrigatório:</strong> Sua planilha precisa ter colunas para <strong>SKU</strong>, <strong>Quantidade</strong> e <strong>Preço</strong>.</li>
+                                <li className="mb-2"><strong>Obrigatório:</strong> Sua planilha precisa ter uma coluna para <strong>SKU</strong>.</li>
                                 <li className="mb-2">Faça o upload do arquivo (CSV ou Excel).</li>
                                 <li className="mb-2">O sistema identifica os produtos pelo SKU.</li>
-                                <li className="mb-2">Se um SKU não for encontrado, você poderá vinculá-lo a um produto existente ou criar um novo.</li>
+                                <li className="mb-2">Se um SKU não for encontrado, você poderá vinculá-lo a um produto existente ou criar um novo produto no estoque.</li>
                                 <li>Revise os resultados e importe as vendas. O estoque é atualizado automaticamente.</li>
                             </ol>
                         </Card.Body>
@@ -782,6 +832,7 @@ const UploadPOS = () => {
                             </Card.Title>
                             <ul className="small mb-0 ps-3">
                                 <li className="mb-2">Se o preço não for informado, usamos o preço médio do estoque.</li>
+                                <li className="mb-2">Produtos novos criados começam com o estoque que você definir.</li>
                                 <li className="mb-2">Vendas são agrupadas por data, cliente e forma de pagamento.</li>
                                 <li>O estoque é baixado usando o método FEFO (primeiro a vencer, primeiro a sair).</li>
                             </ul>
@@ -790,6 +841,7 @@ const UploadPOS = () => {
                 </Col>
             </Row>
 
+            {/* Modal de Pré-visualização */}
             <Modal show={showPreview} onHide={() => setShowPreview(false)} size="xl">
                 <Modal.Header closeButton>
                     <Modal.Title>
@@ -851,82 +903,224 @@ const UploadPOS = () => {
                 </Modal.Body>
             </Modal>
             
-            <Modal show={showLinkModal} onHide={() => setShowLinkModal(false)} centered backdrop="static">
-                <Modal.Header closeButton>
-                    <Modal.Title>Resolver Produto Não Identificado</Modal.Title>
+            {/* Modal de Vincular/Criar Produto */}
+            <Modal show={showLinkModal} onHide={() => {}} centered backdrop="static" size="lg">
+                <Modal.Header className="bg-warning bg-opacity-10">
+                    <Modal.Title>
+                        <ExclamationTriangleFill className="text-warning me-2" />
+                        Resolver Produto Não Identificado
+                    </Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    {currentRowToLink && <>
-                        <Alert variant='warning'>O produto da linha <strong>{currentRowToLink.linha}</strong> (SKU: <strong>{currentRowToLink.sku}</strong>) não foi encontrado.</Alert>
-                        <p>Resolvendo {unidentifiedRows.indexOf(currentRowToLink) + 1} de {unidentifiedRows.length}.</p>
-                        
-                        <Form.Group className="mb-3">
-                            <Form.Check type="radio" label="Vincular a um produto existente" name="linkAction" checked={linkAction === 'link'} onChange={() => setLinkAction('link')} />
-                            <Form.Check type="radio" label="Cadastrar novo produto" name="linkAction" checked={linkAction === 'create'} onChange={() => setLinkAction('create')} />
-                        </Form.Group>
-
-                        {linkAction === 'link' && (
-                            <Form.Group>
-                                <Form.Label>Selecione o produto correto:</Form.Label>
-                                <Form.Select value={selectedLinkProduct} onChange={e => setSelectedLinkProduct(e.target.value)}>
-                                    <option value="">Selecione...</option>
-                                    {inventory.map(item => (
-                                        <option key={item.productId} value={item.productId}>{item.nome} ({item.sku})</option>
-                                    ))}
-                                </Form.Select>
+                    {unidentifiedRows[currentRowIndex] && (
+                        <>
+                            <Alert variant="warning" className="mb-3">
+                                <strong>Produto não encontrado!</strong>
+                                <div className="mt-2">
+                                    <div><strong>Linha:</strong> {unidentifiedRows[currentRowIndex].linha}</div>
+                                    <div><strong>SKU:</strong> {unidentifiedRows[currentRowIndex].sku}</div>
+                                    <div><strong>Nome:</strong> {unidentifiedRows[currentRowIndex].nome}</div>
+                                </div>
+                            </Alert>
+                            
+                            <div className="mb-3 text-center">
+                                <Badge bg="primary" className="px-3 py-2">
+                                    Resolvendo {currentRowIndex + 1} de {unidentifiedRows.length}
+                                </Badge>
+                            </div>
+                            
+                            <Form.Group className="mb-4">
+                                <div className="d-flex gap-3">
+                                    <Form.Check 
+                                        type="radio" 
+                                        label="Vincular a produto existente" 
+                                        name="linkAction" 
+                                        checked={linkAction === 'link'} 
+                                        onChange={() => setLinkAction('link')}
+                                        id="radio-link"
+                                    />
+                                    <Form.Check 
+                                        type="radio" 
+                                        label="Cadastrar novo produto" 
+                                        name="linkAction" 
+                                        checked={linkAction === 'create'} 
+                                        onChange={() => setLinkAction('create')}
+                                        id="radio-create"
+                                    />
+                                </div>
                             </Form.Group>
-                        )}
 
-                        {linkAction === 'create' && (
-                            <>
-                                <Row>
-                                    <Col md={8}>
-                                        <Form.Group className="mb-2">
-                                            <Form.Label>Nome do Produto</Form.Label>
-                                            <Form.Control type="text" value={newProductData.nome} onChange={e => setNewProductData({...newProductData, nome: e.target.value})} />
-                                        </Form.Group>
-                                    </Col>
-                                    <Col md={4}>
-                                        <Form.Group className="mb-2">
-                                            <Form.Label>SKU</Form.Label>
-                                            <Form.Control type="text" value={newProductData.sku} readOnly disabled />
-                                        </Form.Group>
-                                    </Col>
-                                </Row>
-                                <Form.Group className="mb-2">
-                                    <Form.Label>Fabricante (Indústria)</Form.Label>
-                                    <Form.Select value={newProductData.industryId} onChange={e => setNewProductData({...newProductData, industryId: e.target.value})}>
-                                        <option value="">Selecione...</option>
-                                        {industries.map(ind => <option key={ind.id} value={ind.id}>{ind.nomeFantasia}</option>)}
-                                    </Form.Select>
-                                </Form.Group>
-                                <Row>
-                                    <Col>
-                                        <Form.Group className="mb-2">
-                                            <Form.Label>Categoria</Form.Label>
-                                            <Form.Control type="text" value={newProductData.categoria} onChange={e => setNewProductData({...newProductData, categoria: e.target.value})} />
-                                        </Form.Group>
-                                    </Col>
-                                    <Col>
+                            {linkAction === 'link' && (
+                                <Card className="border-primary">
+                                    <Card.Body>
                                         <Form.Group>
-                                            <Form.Label>Preço de Venda</Form.Label>
-                                            <Form.Control type="number" value={newProductData.precoVenda} onChange={e => setNewProductData({...newProductData, precoVenda: parseFloat(e.target.value)})} />
+                                            <Form.Label className="fw-bold">Selecione o produto correto no seu estoque:</Form.Label>
+                                            <Form.Select 
+                                                value={selectedLinkProduct} 
+                                                onChange={e => setSelectedLinkProduct(e.target.value)}
+                                                size="lg"
+                                            >
+                                                <option value="">-- Selecione um produto --</option>
+                                                {inventory.map(item => (
+                                                    <option key={item.productId} value={item.productId}>
+                                                        {item.nome} (SKU: {item.sku}) - Estoque: {item.totalStock}
+                                                    </option>
+                                                ))}
+                                            </Form.Select>
+                                            <Form.Text className="text-muted">
+                                                O produto selecionado será vinculado a este SKU para futuras importações.
+                                            </Form.Text>
                                         </Form.Group>
-                                    </Col>
-                                </Row>
-                            </>
-                        )}
-                    </>}
+                                    </Card.Body>
+                                </Card>
+                            )}
+
+                            {linkAction === 'create' && (
+                                <Card className="border-success">
+                                    <Card.Body>
+                                        <h6 className="mb-3 text-success">
+                                            <i className="bi bi-plus-circle me-2"></i>
+                                            Cadastrar Novo Produto
+                                        </h6>
+                                        <Row>
+                                            <Col md={8}>
+                                                <Form.Group className="mb-3">
+                                                    <Form.Label>Nome do Produto *</Form.Label>
+                                                    <Form.Control 
+                                                        type="text" 
+                                                        value={newProductData.nome} 
+                                                        onChange={e => setNewProductData({...newProductData, nome: e.target.value})}
+                                                        placeholder="Ex: Refrigerante Coca-Cola 2L"
+                                                    />
+                                                </Form.Group>
+                                            </Col>
+                                            <Col md={4}>
+                                                <Form.Group className="mb-3">
+                                                    <Form.Label>SKU *</Form.Label>
+                                                    <Form.Control 
+                                                        type="text" 
+                                                        value={newProductData.sku} 
+                                                        readOnly 
+                                                        disabled
+                                                        className="bg-light"
+                                                    />
+                                                </Form.Group>
+                                            </Col>
+                                        </Row>
+                                        
+                                        <Form.Group className="mb-3">
+                                            <Form.Label>Fabricante/Indústria</Form.Label>
+                                            <Form.Select 
+                                                value={newProductData.industryId} 
+                                                onChange={e => setNewProductData({...newProductData, industryId: e.target.value})}
+                                            >
+                                                <option value="">Marca Própria</option>
+                                                {industries.map(ind => (
+                                                    <option key={ind.id} value={ind.id}>{ind.nomeFantasia}</option>
+                                                ))}
+                                            </Form.Select>
+                                        </Form.Group>
+                                        
+                                        <Row>
+                                            <Col md={4}>
+                                                <Form.Group className="mb-3">
+                                                    <Form.Label>Categoria</Form.Label>
+                                                    <Form.Control 
+                                                        type="text" 
+                                                        value={newProductData.categoria} 
+                                                        onChange={e => setNewProductData({...newProductData, categoria: e.target.value})}
+                                                        placeholder="Ex: Bebidas"
+                                                    />
+                                                </Form.Group>
+                                            </Col>
+                                            <Col md={4}>
+                                                <Form.Group className="mb-3">
+                                                    <Form.Label>Preço de Venda *</Form.Label>
+                                                    <Form.Control 
+                                                        type="number" 
+                                                        step="0.01"
+                                                        value={newProductData.precoVenda} 
+                                                        onChange={e => setNewProductData({...newProductData, precoVenda: parseFloat(e.target.value) || 0})}
+                                                        placeholder="0.00"
+                                                    />
+                                                </Form.Group>
+                                            </Col>
+                                            <Col md={4}>
+                                                <Form.Group className="mb-3">
+                                                    <Form.Label>Custo Médio</Form.Label>
+                                                    <Form.Control 
+                                                        type="number" 
+                                                        step="0.01"
+                                                        value={newProductData.custoMedio} 
+                                                        onChange={e => setNewProductData({...newProductData, custoMedio: parseFloat(e.target.value) || 0})}
+                                                        placeholder="0.00"
+                                                    />
+                                                </Form.Group>
+                                            </Col>
+                                        </Row>
+                                        
+                                        <Form.Group className="mb-3">
+                                            <Form.Label>Estoque Inicial</Form.Label>
+                                            <Form.Control 
+                                                type="number" 
+                                                value={newProductData.estoque} 
+                                                onChange={e => setNewProductData({...newProductData, estoque: parseInt(e.target.value) || 0})}
+                                                placeholder="0"
+                                            />
+                                            <Form.Text className="text-muted">
+                                                Defina a quantidade em estoque. Se for menor que a quantidade da venda, essa linha não será importada.
+                                            </Form.Text>
+                                        </Form.Group>
+                                        
+                                        <Alert variant="info" className="mb-0 small">
+                                            <i className="bi bi-info-circle me-2"></i>
+                                            O produto será criado no seu estoque e vinculado automaticamente a este SKU.
+                                        </Alert>
+                                    </Card.Body>
+                                </Card>
+                            )}
+                        </>
+                    )}
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowLinkModal(false)}>Cancelar Importação</Button>
-                    {linkAction === 'link' && <Button variant="primary" onClick={handleLinkProduct} disabled={!selectedLinkProduct}>Vincular e Continuar</Button>}
-                    {linkAction === 'create' && <Button variant="success" onClick={handleCreateProduct} disabled={!newProductData.nome || !newProductData.sku}>Criar e Continuar</Button>}
+                    <Button 
+                        variant="outline-secondary" 
+                        onClick={() => {
+                            if (window.confirm('Tem certeza que deseja cancelar? Todo o progresso será perdido.')) {
+                                setShowLinkModal(false);
+                                setUnidentifiedRows([]);
+                                setCurrentRowIndex(0);
+                            }
+                        }}
+                    >
+                        Cancelar Importação
+                    </Button>
+                    
+                    {linkAction === 'link' && (
+                        <Button 
+                            variant="primary" 
+                            onClick={handleLinkProduct} 
+                            disabled={!selectedLinkProduct}
+                        >
+                            <i className="bi bi-link-45deg me-2"></i>
+                            Vincular e Continuar
+                        </Button>
+                    )}
+                    
+                    {linkAction === 'create' && (
+                        <Button 
+                            variant="success" 
+                            onClick={handleCreateProduct} 
+                            disabled={!newProductData.nome || !newProductData.sku || newProductData.precoVenda <= 0}
+                        >
+                            <i className="bi bi-plus-circle me-2"></i>
+                            Criar e Continuar
+                        </Button>
+                    )}
                 </Modal.Footer>
             </Modal>
-
         </Container>
     );
 };
 
-export default UploadPOS;
+export default UploadPOS;                                               
