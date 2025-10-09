@@ -766,7 +766,7 @@ const UploadPOS = () => {
                                 </div>
                             </div>
                             <ol className="small ps-3 mb-0">
-                                <li className="mb-2"><strong>Obrigatório:</strong> Sua planilha precisa ter uma coluna <strong>SKU</strong>.</li>
+                                <li className="mb-2"><strong>Obrigatório:</strong> Sua planilha precisa ter colunas para <strong>SKU</strong>, <strong>Quantidade</strong> e <strong>Preço</strong>.</li>
                                 <li className="mb-2">Faça o upload do arquivo (CSV ou Excel).</li>
                                 <li className="mb-2">O sistema identifica os produtos pelo SKU.</li>
                                 <li className="mb-2">Se um SKU não for encontrado, você poderá vinculá-lo a um produto existente ou criar um novo.</li>
