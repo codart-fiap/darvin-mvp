@@ -61,6 +61,7 @@ const Sidebar = () => {
   const renderIndustryLinks = () => (
     <>
       <SidebarLink to="/industry/dashboard" icon={<HouseDoorFill />}>Dashboard</SidebarLink>
+      <SidebarLink to="/industry/programs" icon={<AwardFill />}>Programas</SidebarLink>
       <SidebarLink to="/industry/vision" icon={<BinocularsFill />}>Darvin Vision</SidebarLink>
     </>
   );

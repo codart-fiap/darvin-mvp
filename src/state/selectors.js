@@ -626,3 +626,39 @@ export const getDarvinVisionData = (industryId) => {
         favoritesByProfile: processedFavorites
     };
 };
+
+// --- NOVO SELECTOR PARA PROGRAMAS DA INDÚSTRIA ---
+export const getProgramsByIndustry = (industryId) => {
+    const allPrograms = getItem('programs') || [];
+    const subscriptions = getItem('programSubscriptions') || [];
+    const allSales = getItem('sales') || [];
+    const allProducts = getItem('products') || [];
+
+    const industryPrograms = allPrograms.filter(p => p.industryId === industryId);
+
+    return industryPrograms.map(program => {
+        const programSubscriptions = subscriptions.filter(s => s.programId === program.id);
+        const participants = programSubscriptions.length;
+
+        const programSales = allSales.filter(sale => {
+            const saleDate = new Date(sale.dataISO);
+            return saleDate >= new Date(program.startDate) && saleDate <= new Date(program.endDate);
+        });
+
+        let totalSales = 0;
+        programSales.forEach(sale => {
+            sale.itens.forEach(item => {
+                const product = allProducts.find(p => p.id === item.productId);
+                if (product && product.industryId === industryId) {
+                    totalSales += item.qtde * item.precoUnit;
+                }
+            });
+        });
+
+        return {
+            ...program,
+            participants,
+            totalSales
+        };
+    });
+};

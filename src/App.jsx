@@ -19,6 +19,7 @@ import Assistant from './pages/retail/Assistant';
 // Páginas da Indústria
 import DashboardIndustry from './pages/industry/DashboardIndustry';
 import DarvinVision from './pages/industry/DarvinVision'; 
+import ProgramsIndustry from './pages/industry/ProgramsIndustry';
 
 function App() {
   return (
@@ -55,6 +56,7 @@ function App() {
           }
         >
           <Route path="/industry/dashboard" element={<DashboardIndustry />} />
+          <Route path="/industry/programs" element={<ProgramsIndustry />} />
           <Route path="/industry/vision" element={<DarvinVision />} />
         </Route>
 
