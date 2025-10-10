@@ -23,7 +23,8 @@ const ProgramsIndustry = () => {
         endDate: '',
         metricType: 'volume_venda_sku',
         metricValue: '',
-        tags: ''
+        tags: '',
+        minRating: ''
     });
 
     const programs = useMemo(() => {
@@ -37,7 +38,7 @@ const ProgramsIndustry = () => {
         if (type === 'new') {
             setNewProgramData({
                 title: '', description: '', rules: '', reward: '', startDate: '', endDate: '',
-                metricType: 'volume_venda_sku', metricValue: '', tags: ''
+                metricType: 'volume_venda_sku', metricValue: '', tags: '', minRating: ''
             });
         } else if (type === 'edit' && program) {
             setNewProgramData({
@@ -49,7 +50,8 @@ const ProgramsIndustry = () => {
                 endDate: program.endDate.split('T')[0],
                 tags: program.tags.join(', '),
                 metricType: program.metric.type,
-                metricValue: program.metric.target || program.metric.sku || ''
+                metricValue: program.metric.target || program.metric.sku || '',
+                minRating: program.minRating || ''
             });
         }
         setShowModal(true);
@@ -80,7 +82,8 @@ const ProgramsIndustry = () => {
             startDate: new Date(newProgramData.startDate).toISOString(),
             endDate: new Date(newProgramData.endDate).toISOString(),
             tags: newProgramData.tags.split(',').map(t => t.trim()),
-            metric: metric
+            metric: metric,
+            minRating: newProgramData.minRating
         };
 
         if (modalType === 'edit') {
@@ -163,6 +166,18 @@ const ProgramsIndustry = () => {
                                 </Form.Group>
                             </Col>
                         </Row>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Rating Mínimo</Form.Label>
+                            <Form.Select value={newProgramData.minRating} onChange={e => setNewProgramData({...newProgramData, minRating: e.target.value})}>
+                                <option value="">Sem rating mínimo</option>
+                                <option value="E">E</option>
+                                <option value="D">D</option>
+                                <option value="C">C</option>
+                                <option value="B">B</option>
+                                <option value="A">A</option>
+                                <option value="A+">A+</option>
+                            </Form.Select>
+                        </Form.Group>
                     </Form>
                 </Modal.Body>
                 <Modal.Footer>
@@ -216,6 +231,11 @@ const ProgramsIndustry = () => {
                                         <ListGroup.Item>
                                             <strong>Recompensa:</strong> <span className="text-success">{program.reward}</span>
                                         </ListGroup.Item>
+                                        {program.minRating && (
+                                            <ListGroup.Item>
+                                                <strong>Rating Mínimo:</strong> <Badge bg="warning" text="dark">{program.minRating}</Badge>
+                                            </ListGroup.Item>
+                                        )}
                                     </ListGroup>
                                 </Card.Body>
                                 <Card.Footer>

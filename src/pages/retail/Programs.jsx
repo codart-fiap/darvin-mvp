@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { getProgramsForRetailer, getRetailerRating, getActorsByType } from '../../state/selectors';
 import { setItem, getItem } from '../../state/storage';
 import { Container, Card, Row, Col, Button, Collapse, ProgressBar, Alert, Modal, Nav, Form, Badge } from 'react-bootstrap';
-import { StarFill, BarChartLineFill, PeopleFill, CalendarCheckFill } from 'react-bootstrap-icons';
+import { StarFill, BarChartLineFill, PeopleFill, CalendarCheckFill, LockFill } from 'react-bootstrap-icons';
 
 const Programs = () => {
     const { user } = useAuth();
@@ -140,7 +140,7 @@ const Programs = () => {
 
                     {filteredAndSortedPrograms.length > 0 ? (
                         filteredAndSortedPrograms.map(program => (
-                            <Card key={program.id} className="program-card mb-3">
+                            <Card key={program.id} className={`program-card mb-3 ${!program.isEligible && !program.isSubscribed ? 'bg-light' : ''}`}>
                                 <Card.Body>
                                     <Row>
                                         <Col md={3} className="text-center">
@@ -152,6 +152,11 @@ const Programs = () => {
                                         <Col md={9}>
                                             <Card.Title>{program.title}</Card.Title>
                                             <Card.Text className="small">{program.description}</Card.Text>
+                                            {program.minRating && (
+                                                <p className="small mb-2">
+                                                    <strong>Rating Mínimo:</strong> <Badge bg={program.isEligible ? 'success' : 'warning'} text="dark">{program.minRating}</Badge>
+                                                </p>
+                                            )}
                                             <Button variant="outline-primary" size="sm" onClick={() => handleToggleExpand(program.id)}>
                                                 {expandedId === program.id ? 'Ver Menos' : 'Ver Detalhes'}
                                             </Button>
@@ -175,7 +180,13 @@ const Programs = () => {
                                             )}
                                             {!program.isSubscribed && !program.isCompleted && (
                                                 <div className="d-grid mt-3">
-                                                    <Button variant="primary" onClick={() => handleShowConfirmModal(program)}>Aderir ao Programa</Button>
+                                                    <Button 
+                                                        variant="primary" 
+                                                        onClick={() => handleShowConfirmModal(program)}
+                                                        disabled={!program.isEligible}
+                                                    >
+                                                        {program.isEligible ? 'Aderir ao Programa' : <><LockFill className="me-2"/> Rating Insuficiente</>}
+                                                    </Button>
                                                 </div>
                                             )}
                                             {program.isCompleted && (

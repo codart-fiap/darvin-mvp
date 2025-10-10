@@ -288,11 +288,16 @@ export const getProgramsForRetailer = (retailerId) => {
     const subscriptions = getItem('programSubscriptions') || [];
     const sales = getSalesByRetailer(retailerId);
     const products = getItem('products') || [];
+    const retailerRating = getRetailerRating(retailerId);
+    const ratingOrder = { 'A+': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1, 'E': 0 };
+
 
     return programs.map(program => {
         const industry = industries.find(i => i.id === program.industryId);
         const subscription = subscriptions.find(s => s.retailerId === retailerId && s.programId === program.id);
         const isCompleted = new Date() > new Date(program.endDate);
+
+        const isEligible = !program.minRating || (ratingOrder[retailerRating.rating] >= ratingOrder[program.minRating]);
 
         let progress = { current: 0, target: 0, percentage: 0 };
 
@@ -349,6 +354,7 @@ export const getProgramsForRetailer = (retailerId) => {
             industryLogo: industry?.logo,
             isSubscribed: !!subscription,
             isCompleted,
+            isEligible,
             progress
         };
     });

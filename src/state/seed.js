@@ -492,6 +492,7 @@ export const seedDatabase = () => {
       reward: 'Bonificação de R$ 300,00 creditada na sua conta.',
       startDate: '2025-10-01T00:00:00.000Z',
       endDate: '2025-12-31T23:59:59.000Z',
+      minRating: 'C',
       metric: {
         type: 'percentual_venda_categoria',
         categories: ['Refrigerantes', 'Sucos'],
@@ -508,6 +509,7 @@ export const seedDatabase = () => {
       reward: '1 caixa de Biscoito Recheado Chocolate grátis.',
       startDate: '2025-09-15T00:00:00.000Z',
       endDate: '2025-11-15T23:59:59.000Z',
+      minRating: '',
       metric: {
         type: 'volume_compra_categoria',
         categories: ['Biscoitos'],
@@ -524,6 +526,7 @@ export const seedDatabase = () => {
       reward: 'Um kit exclusivo de produtos LimpMax avaliado em R$ 200,00.',
       startDate: '2025-10-01T00:00:00.000Z',
       endDate: '2025-11-30T23:59:59.000Z',
+      minRating: 'B',
       metric: {
         type: 'volume_venda_sku',
         sku: 'LMP0004',
@@ -540,6 +543,7 @@ export const seedDatabase = () => {
       reward: 'Sua loja será destacada em nossas redes sociais como um ponto de venda oficial.',
       startDate: '2025-11-01T00:00:00.000Z',
       endDate: '2025-12-15T23:59:59.000Z',
+      minRating: '',
       metric: {
         type: 'mix_produtos',
         skus: { 'HIG0005': 5, 'HIG0006': 5 },
@@ -556,6 +560,7 @@ export const seedDatabase = () => {
       reward: 'Desconto de 5% a 10% no próximo pedido.',
       startDate: '2025-10-15T00:00:00.000Z',
       endDate: '2025-12-31T23:59:59.000Z',
+      minRating: 'A',
       metric: {
         type: 'volume_compra_marca',
         marca: 'Boreal',
@@ -572,6 +577,7 @@ export const seedDatabase = () => {
       reward: 'R$ 50 em crédito a cada 30 combos vendidos.',
       startDate: '2025-09-01T00:00:00.000Z',
       endDate: '2025-11-30T23:59:59.000Z',
+      minRating: '',
       metric: {
         type: 'combo_venda',
         skus: ['ALI0018', 'ALI0001', 'ALI0021'],
