@@ -1,400 +1,610 @@
 // FILE: src/pages/retail/Inventory.jsx
-import React, { useState, useEffect, useMemo } from 'react';
-import { useAuth } from '../../hooks/useAuth';
-import { getInventoryByRetailer, getActorsByType } from '../../state/selectors';
-import { getItem, setItem } from '../../state/storage';
-import { generateId } from '../../utils/ids';
-import { Container, Table, Button, Modal, Form, Row, Col, Card, Badge, Collapse, OverlayTrigger, Tooltip } from 'react-bootstrap';
-import { PlusCircleFill, InfoCircleFill, Trash3Fill } from 'react-bootstrap-icons';
-
-// --- COMPONENTE OTIMIZADO ---
-const ProductDetailRow = ({ item }) => {
-    const details = item.salesDetails; 
-
-    return (
-        <tr className="product-details-row">
-            <td colSpan="8">
-                <Collapse in={!!item.isExpanded}>
-                    <div>
-                       <Card body className="bg-light border-2 p-3">
-                           <Row>
-                               <Col md={12} className="mb-3">
-                                   <h6 className="text-muted">Lotes Disponíveis</h6>
-                                   <Table striped bordered size="sm">
-                                       <thead><tr><th>Validade</th><th>Estoque</th><th>Custo (R$)</th></tr></thead>
-                                       <tbody>
-                                           {item.batches.sort((a,b) => new Date(a.dataValidade) - new Date(b.dataValidade)).map(batch => (
-                                               <tr key={batch.id}>
-                                                   <td>{new Date(batch.dataValidade).toLocaleDateString('pt-BR')}</td>
-                                                   <td>{batch.estoque}</td>
-                                                   <td>{batch.custoMedio.toFixed(2)}</td>
-                                               </tr>
-                                           ))}
-                                       </tbody>
-                                   </Table>
-                               </Col>
-                               <Col md={4}>
-                                   <h6 className="text-muted">Vendas (Últimos 30 dias)</h6>
-                                   <p className="h4">{details.salesCount} vendas | {details.quantitySold} un.</p>
-                               </Col>
-                               <Col md={4}>
-                                   <h6 className="text-muted">Performance Financeira</h6>
-                                   <p className="mb-0"><small>Preço Médio Venda:</small> R$ {details.averagePrice.toFixed(2)}</p>
-                                   <p><small>Lucro Médio/Un:</small> R$ {details.averageProfit.toFixed(2)}</p>
-                               </Col>
-                               <Col md={4}>
-                                   <h6 className="text-muted">Próximo Vencimento</h6>
-                                   <p className="h5">{item.nextExpiryDate ? new Date(item.nextExpiryDate).toLocaleDateString('pt-BR') : 'N/A'}</p>
-                               </Col>
-                           </Row>
-                       </Card>
-                    </div>
-                </Collapse>
-            </td>
-        </tr>
-    );
-};
-
+import React, { useState, useMemo, useEffect } from 'react';
+import { useAuth } from '../../hooks/useAuth.js';
+import { getInventoryByRetailer } from '../../state/selectors.js';
+import { getItem, setItem } from '../../state/storage.js';
+import { generateId } from '../../utils/ids.js';
+import {
+    Container, Row, Col, Card, Table, Button, Form,
+    Modal, Alert, Badge, InputGroup
+} from 'react-bootstrap';
+import {
+    Search, Plus, PencilSquare, Trash,
+    ExclamationTriangle, CheckCircle,
+    XCircle
+} from 'react-bootstrap-icons';
 
 const Inventory = () => {
     const { user } = useAuth();
+    const [inventory, setInventory] = useState([]);
+    const [showModal, setShowModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [modalMode, setModalMode] = useState('create'); // 'create' ou 'edit'
+    const [selectedItem, setSelectedItem] = useState(null); // Para edição/exclusão única
+    const [selectedProducts, setSelectedProducts] = useState(new Set()); // Para seleção múltipla
+
+    // Filtros
+    const [searchTerm, setSearchTerm] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('all');
+    const [stockFilter, setStockFilter] = useState('all');
+    const [sourceFilter, setSourceFilter] = useState('all');
+
+    const [formData, setFormData] = useState({
+        nome: '',
+        sku: '',
+        categoria: 'Alimentos',
+        marca: '',
+        estoque: 0,
+        custoMedio: 0,
+        precoVenda: 0,
+        dataValidade: ''
+    });
+
+    const [formErrors, setFormErrors] = useState({});
+    
+    // Recarregar o inventário quando uma venda é finalizada
     const [lastUpdated, setLastUpdated] = useState(Date.now());
 
-    const [inventoryItems, setInventoryItems] = useState([]);
-    const [industries, setIndustries] = useState([]);
-    
-    const [showModal, setShowModal] = useState(false);
-    const [modalType, setModalType] = useState('');
-    const [currentItem, setCurrentItem] = useState(null);
-    const [editData, setEditData] = useState({});
-
-    const [categoryFilter, setCategoryFilter] = useState('all');
-    const [brandFilter, setBrandFilter] = useState('all');
-    const [expandedRow, setExpandedRow] = useState(null);
 
     useEffect(() => {
         if (user) {
-            setInventoryItems(getInventoryByRetailer(user.actorId));
-            setIndustries(getActorsByType('industry'));
+            loadInventory();
         }
     }, [user, lastUpdated]);
 
-    const uniqueCategories = useMemo(() => [...new Set(inventoryItems.map(item => item.categoria))].sort(), [inventoryItems]);
-    const uniqueBrands = useMemo(() => [...new Set(inventoryItems.map(item => item.marca))].sort(), [inventoryItems]);
+    const loadInventory = () => {
+        const data = getInventoryByRetailer(user.actorId);
+        setInventory(data);
+        setSelectedProducts(new Set());
+    };
 
-    const filteredItems = useMemo(() => {
-        return inventoryItems.filter(item => {
-            const categoryMatch = categoryFilter === 'all' || item.categoria === categoryFilter;
-            const brandMatch = brandFilter === 'all' || item.marca === brandFilter;
-            return categoryMatch && brandMatch;
-        }).map(item => ({...item, isExpanded: item.productId === expandedRow }));
-    }, [inventoryItems, categoryFilter, brandFilter, expandedRow]);
+    // Filtros e busca
+    const filteredInventory = useMemo(() => {
+        return inventory.filter(item => {
+            const matchesSearch = !searchTerm ||
+                item.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.marca.toLowerCase().includes(searchTerm.toLowerCase());
+
+            const matchesCategory = categoryFilter === 'all' || item.categoria === categoryFilter;
+
+            let matchesStock = true;
+            if (stockFilter === 'low') matchesStock = item.totalStock > 0 && item.totalStock <= 10;
+            else if (stockFilter === 'out') matchesStock = item.totalStock === 0;
+            else if (stockFilter === 'ok') matchesStock = item.totalStock > 10;
+            
+            // Note: A lógica de 'source' (origem) não está nos dados, então foi removida.
+            // Se precisar, adicione uma propriedade 'origem' aos seus dados de inventário.
+            // let matchesSource = true;
+            // if (sourceFilter === 'imported') matchesSource = item.marca === 'Importado';
+            // else if (sourceFilter === 'native') matchesSource = item.marca !== 'Importado';
+
+            return matchesSearch && matchesCategory && matchesStock;
+        });
+    }, [inventory, searchTerm, categoryFilter, stockFilter, sourceFilter]);
+
+    // Estatísticas
+    const stats = useMemo(() => {
+        const totalProducts = inventory.length;
+        const totalValue = inventory.reduce((sum, item) => sum + (item.avgPrice * item.totalStock), 0);
+        const totalCost = inventory.reduce((sum, item) => sum + (item.avgCost * item.totalStock), 0);
+        const lowStock = inventory.filter(item => item.totalStock > 0 && item.totalStock <= 10).length;
+        const outOfStock = inventory.filter(item => item.totalStock === 0).length;
+
+        return { totalProducts, totalValue, totalCost, lowStock, outOfStock };
+    }, [inventory]);
+
+    // Categorias únicas
+    const categories = useMemo(() => {
+        return [...new Set(inventory.map(item => item.categoria))].sort();
+    }, [inventory]);
+
+    // Funções de Seleção Múltipla
+    const toggleSelect = (productId) => {
+        const newSelection = new Set(selectedProducts);
+        if (newSelection.has(productId)) {
+            newSelection.delete(productId);
+        } else {
+            newSelection.add(productId);
+        }
+        setSelectedProducts(newSelection);
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedProducts.size === filteredInventory.length) {
+            setSelectedProducts(new Set());
+        } else {
+            setSelectedProducts(new Set(filteredInventory.map(item => item.productId)));
+        }
+    };
     
-    const handleOpenModal = (type, item = null) => {
-        setModalType(type);
-        setCurrentItem(item);
-        if (type === 'ajuste') {
-            setEditData({
-                nome: item?.nome || '',
-                categoria: item?.categoria || '',
-                industryId: item?.industryId || '',
-                precoVenda: item?.batches[0]?.precoVenda || 0
-            });
-        }
-        if (type === 'entrada') {
-            setEditData({
-                quantidade: 1,
-                custoCompra: item?.avgCost || 0,
-                precoVenda: item?.avgPrice || 0,
-                dataValidade: ''
-            });
-        }
-        if (type === 'novoProduto') {
-            setEditData({ nome: '', sku: '', categoria: '', industryId: '', estoque: 1, custoMedio: '', precoVenda: '', dataValidade: '' });
-        }
+    // Abrir modal para criar
+    const handleCreate = () => {
+        setModalMode('create');
+        setFormData({
+            nome: '',
+            sku: `SKU-${Date.now()}`,
+            categoria: 'Alimentos',
+            marca: '',
+            estoque: 0,
+            custoMedio: 0,
+            precoVenda: 0,
+            dataValidade: ''
+        });
+        setFormErrors({});
         setShowModal(true);
     };
 
-    const handleCloseModal = () => {
-        setShowModal(false);
-        setCurrentItem(null);
-        setEditData({});
-    };
-    
-    const handleToggleExpand = (itemId) => {
-      setExpandedRow(expandedRow === itemId ? null : itemId);
+    // Abrir modal para editar
+    const handleEdit = (item) => {
+        setModalMode('edit');
+        setSelectedItem(item);
+        // Popula o formulário com os dados do item. Pega os valores do primeiro lote como base.
+        setFormData({
+            nome: item.nome,
+            sku: item.sku,
+            categoria: item.categoria,
+            marca: item.marca,
+            estoque: item.totalStock,
+            custoMedio: item.avgCost,
+            precoVenda: item.avgPrice,
+            dataValidade: item.nextExpiryDate ? item.nextExpiryDate.split('T')[0] : ''
+        });
+        setFormErrors({});
+        setShowModal(true);
     };
 
-    const handleSaveChanges = () => {
-        if (modalType === 'ajuste') {
+    // Função centralizada para atualizar o formulário
+    const handleFormChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prevData => ({
+            ...prevData,
+            [name]: value
+        }));
+    };
+
+    // Validação do formulário
+    const validateForm = () => {
+        const errors = {};
+
+        if (!formData.nome.trim()) errors.nome = 'Nome é obrigatório';
+        if (!formData.sku.trim()) errors.sku = 'SKU é obrigatório';
+        if (!formData.marca.trim()) errors.marca = 'Marca é obrigatória';
+        if (formData.estoque < 0) errors.estoque = 'Estoque não pode ser negativo';
+        if (formData.custoMedio < 0) errors.custoMedio = 'Custo não pode ser negativo';
+        if (formData.precoVenda <= 0) errors.precoVenda = 'Preço de venda deve ser maior que zero';
+
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
+    // Salvar (criar ou editar)
+    const handleSave = () => {
+        if (!validateForm()) return;
+        
+        const skuExists = inventory.some(item => 
+            item.sku === formData.sku && 
+            (modalMode === 'create' || item.productId !== selectedItem.productId)
+        );
+
+        if (skuExists) {
+            setFormErrors(prev => ({ ...prev, sku: 'Este SKU já está em uso.' }));
+            return;
+        }
+
+        try {
             const allProducts = getItem('products') || [];
             const allInventory = getItem('inventory') || [];
-            
-            const updatedProducts = allProducts.map(p => {
-                if (p.id === currentItem.productId) {
-                    return {
-                        ...p,
-                        nome: editData.nome,
-                        categoria: editData.categoria,
-                        industryId: editData.industryId,
-                        marca: industries.find(i => i.id === editData.industryId)?.nomeFantasia || p.marca,
-                    };
-                }
-                return p;
-            });
-            setItem('products', updatedProducts);
-            
-            const updatedInventory = allInventory.map(invItem => {
-                if (invItem.id === currentItem.batches[0].id) {
-                    return { ...invItem, precoVenda: parseFloat(editData.precoVenda) };
-                }
-                return invItem;
-            });
-            setItem('inventory', updatedInventory);
+
+            if (modalMode === 'create') {
+                const newProductId = generateId();
+                const newProduct = {
+                    id: newProductId, sku: formData.sku, nome: formData.nome, categoria: formData.categoria,
+                    subcategoria: 'Geral', industryId: 'manual', precoSugerido: parseFloat(formData.precoVenda),
+                    marca: formData.marca
+                };
+                
+                const validade = formData.dataValidade
+                    ? new Date(formData.dataValidade).toISOString()
+                    : new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString();
+
+                const newInventoryItem = {
+                    id: generateId(), retailerId: user.actorId, productId: newProductId, 
+                    sku: formData.sku, nome: formData.nome,
+                    estoque: parseInt(formData.estoque, 10), custoMedio: parseFloat(formData.custoMedio),
+                    precoVenda: parseFloat(formData.precoVenda), dataValidade: validade
+                };
+
+                setItem('products', [...allProducts, newProduct]);
+                setItem('inventory', [...allInventory, newInventoryItem]);
+
+            } else { // Modo 'edit'
+                const updatedProducts = allProducts.map(p => 
+                    p.id === selectedItem.productId 
+                        ? { ...p, nome: formData.nome, sku: formData.sku, marca: formData.marca, categoria: formData.categoria, precoSugerido: parseFloat(formData.precoVenda) } 
+                        : p
+                );
+
+                const validade = formData.dataValidade
+                    ? new Date(formData.dataValidade).toISOString()
+                    : selectedItem.nextExpiryDate;
+                
+                // Na edição, atualizamos o lote mais antigo
+                const firstBatchId = selectedItem.batches.sort((a, b) => new Date(a.dataValidade) - new Date(b.dataValidade))[0]?.id;
+
+                const updatedInventory = allInventory.map(inv => {
+                    if (inv.productId === selectedItem.productId) {
+                        const baseUpdate = { ...inv, nome: formData.nome, sku: formData.sku, categoria: formData.categoria, marca: formData.marca };
+                        if (inv.id === firstBatchId) {
+                            return { 
+                                ...baseUpdate, 
+                                estoque: parseInt(formData.estoque, 10), 
+                                custoMedio: parseFloat(formData.custoMedio),
+                                precoVenda: parseFloat(formData.precoVenda),
+                                dataValidade: validade
+                            };
+                        }
+                        return baseUpdate;
+                    }
+                    return inv;
+                });
+                
+                setItem('products', updatedProducts);
+                setItem('inventory', updatedInventory);
+            }
+
+            setShowModal(false);
+            setLastUpdated(Date.now());
+            alert(modalMode === 'create' ? 'Produto cadastrado!' : 'Produto atualizado!');
+
+        } catch (error) {
+            console.error('Erro ao salvar produto:', error);
+            alert('Erro ao salvar produto.');
         }
-        
-        if (modalType === 'entrada') {
+    };
+    
+    // Abrir modal de exclusão
+    const handleDelete = (item = null) => {
+        if (item) {
+            setSelectedProducts(new Set([item.productId]));
+        }
+        setShowDeleteModal(true);
+    };
+    
+    // Confirmar exclusão
+    const confirmDelete = () => {
+        try {
+            const allProducts = getItem('products') || [];
             const allInventory = getItem('inventory') || [];
-            const newInventoryItem = {
-                id: generateId(),
-                retailerId: user.actorId,
-                productId: currentItem.productId,
-                sku: currentItem.sku,
-                estoque: parseInt(editData.quantidade, 10),
-                custoMedio: parseFloat(editData.custoCompra),
-                precoVenda: parseFloat(editData.precoVenda),
-                dataValidade: new Date(editData.dataValidade).toISOString()
-            };
-            setItem('inventory', [...allInventory, newInventoryItem]);
-        }
-        
-        setLastUpdated(Date.now());
-        handleCloseModal();
-    };
 
-    const handleCreateNewProduct = () => {
-        const allProducts = getItem('products') || [];
-        const allInventory = getItem('inventory') || [];
-        const selectedIndustry = industries.find(i => i.id === editData.industryId);
-
-        const newProductId = generateId();
-        
-        const newProduct = {
-            id: newProductId, sku: editData.sku, nome: editData.nome, categoria: editData.categoria,
-            subcategoria: 'Geral', marca: selectedIndustry.nomeFantasia, industryId: editData.industryId,
-            precoSugerido: parseFloat(editData.precoVenda)
-        };
-        setItem('products', [...allProducts, newProduct]);
-
-        const newInventoryItem = {
-            id: generateId(), retailerId: user.actorId, productId: newProductId, sku: editData.sku,
-            estoque: parseInt(editData.estoque, 10), custoMedio: parseFloat(editData.custoMedio),
-            precoVenda: parseFloat(editData.precoVenda), dataValidade: new Date(editData.dataValidade).toISOString()
-        };
-        setItem('inventory', [...allInventory, newInventoryItem]);
-        
-        setLastUpdated(Date.now());
-        handleCloseModal();
-    };
-
-    // --- NOVA FUNÇÃO DE EXCLUSÃO ---
-    const handleDeleteProduct = () => {
-        if (!currentItem) return;
-
-        // Remove o produto da lista de produtos
-        const allProducts = getItem('products') || [];
-        const updatedProducts = allProducts.filter(p => p.id !== currentItem.productId);
-        setItem('products', updatedProducts);
-
-        // Remove todos os lotes (itens de inventário) associados a esse produto
-        const allInventory = getItem('inventory') || [];
-        const updatedInventory = allInventory.filter(item => item.productId !== currentItem.productId);
-        setItem('inventory', updatedInventory);
-        
-        setLastUpdated(Date.now());
-        handleCloseModal();
-    };
-
-    const renderModalContent = () => {
-        switch(modalType) {
-            // --- NOVO MODAL DE CONFIRMAÇÃO DE EXCLUSÃO ---
-            case 'excluir':
-                return (
-                    <>
-                        <Modal.Header closeButton>
-                            <Modal.Title>Confirmar Exclusão</Modal.Title>
-                        </Modal.Header>
-                        <Modal.Body>
-                            <p>Você tem certeza que deseja excluir o produto <strong>"{currentItem?.nome}"</strong>?</p>
-                            <p className="text-danger">Esta ação é irreversível e removerá todos os lotes e o histórico associado a este item do seu estoque.</p>
-                        </Modal.Body>
-                        <Modal.Footer>
-                            <Button variant="secondary" onClick={handleCloseModal}>Cancelar</Button>
-                            <Button variant="danger" onClick={handleDeleteProduct}>Sim, Excluir Produto</Button>
-                        </Modal.Footer>
-                    </>
-                );
-            case 'novoProduto':
-                return (
-                    <>
-                        <Modal.Header closeButton><Modal.Title>Cadastrar Novo Produto</Modal.Title></Modal.Header>
-                        <Modal.Body>
-                             <Form>
-                                <Row>
-                                    <Col md={8}><Form.Group className="mb-3"><Form.Label>Nome do Produto</Form.Label><Form.Control type="text" value={editData.nome} onChange={e => setEditData({...editData, nome: e.target.value})} /></Form.Group></Col>
-                                    <Col md={4}><Form.Group className="mb-3"><Form.Label>SKU</Form.Label><Form.Control type="text" value={editData.sku} onChange={e => setEditData({...editData, sku: e.target.value})} /></Form.Group></Col>
-                                </Row>
-                                <Row>
-                                    <Col md={6}><Form.Group className="mb-3"><Form.Label>Fabricante (Indústria)</Form.Label><Form.Select value={editData.industryId} onChange={e => setEditData({...editData, industryId: e.target.value})}><option value="">Selecione...</option>{industries.map(ind => <option key={ind.id} value={ind.id}>{ind.nomeFantasia}</option>)}</Form.Select></Form.Group></Col>
-                                    <Col md={6}><Form.Group className="mb-3"><Form.Label>Categoria</Form.Label><Form.Control type="text" value={editData.categoria} onChange={e => setEditData({...editData, categoria: e.target.value})} /></Form.Group></Col>
-                                </Row>
-                                <Row>
-                                    <Col><Form.Group className="mb-3"><Form.Label>Qtd. Inicial</Form.Label><Form.Control type="number" value={editData.estoque} onChange={e => setEditData({...editData, estoque: e.target.value})} min="0" /></Form.Group></Col>
-                                    <Col><Form.Group className="mb-3"><Form.Label>Custo (R$)</Form.Label><Form.Control type="number" value={editData.custoMedio} onChange={e => setEditData({...editData, custoMedio: e.target.value})} min="0" step="0.01" /></Form.Group></Col>
-                                    <Col><Form.Group className="mb-3"><Form.Label>Preço Venda (R$)</Form.Label><Form.Control type="number" value={editData.precoVenda} onChange={e => setEditData({...editData, precoVenda: e.target.value})} min="0" step="0.01" /></Form.Group></Col>
-                                </Row>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Data de Validade</Form.Label>
-                                    <Form.Control type="date" value={editData.dataValidade} onChange={e => setEditData({...editData, dataValidade: e.target.value})} />
-                                </Form.Group>
-                            </Form>
-                        </Modal.Body>
-                        <Modal.Footer>
-                            <Button variant="secondary" onClick={handleCloseModal}>Cancelar</Button>
-                            <Button variant="primary" onClick={handleCreateNewProduct}>Salvar Produto</Button>
-                        </Modal.Footer>
-                    </>
-                );
-            case 'entrada':
-                return (
-                     <>
-                        <Modal.Header closeButton><Modal.Title>Registrar Novo Lote: {currentItem?.nome}</Modal.Title></Modal.Header>
-                        <Modal.Body>
-                            <Form.Group className="mb-3">
-                               <Form.Label>Quantidade a Adicionar</Form.Label>
-                               <Form.Control type="number" value={editData.quantidade} onChange={e => setEditData({...editData, quantidade: e.target.value})} min="1" autoFocus />
-                            </Form.Group>
-                            <Row>
-                                <Col>
-                                    <Form.Group className="mb-3">
-                                       <Form.Label>Custo de Compra (Un.)</Form.Label>
-                                       <Form.Control type="number" value={editData.custoCompra} onChange={e => setEditData({...editData, custoCompra: e.target.value})} min="0" step="0.01" />
-                                    </Form.Group>
-                                </Col>
-                                <Col>
-                                    <Form.Group className="mb-3">
-                                       <Form.Label>Preço de Venda (Un.)</Form.Label>
-                                       <Form.Control type="number" value={editData.precoVenda} onChange={e => setEditData({...editData, precoVenda: e.target.value})} min="0" step="0.01" />
-                                    </Form.Group>
-                                </Col>
-                            </Row>
-                            <Form.Group className="mb-3">
-                                <Form.Label>Data de Validade do Lote</Form.Label>
-                                <Form.Control type="date" value={editData.dataValidade} onChange={(e) => setEditData({...editData, dataValidade: e.target.value})} />
-                            </Form.Group>
-                        </Modal.Body>
-                        <Modal.Footer>
-                            <Button variant="secondary" onClick={handleCloseModal}>Cancelar</Button>
-                            <Button variant="primary" onClick={handleSaveChanges} disabled={!editData.dataValidade}>Salvar Novo Lote</Button>
-                        </Modal.Footer>
-                    </>
-                );
-            case 'ajuste':
-                return (
-                    <>
-                        <Modal.Header closeButton><Modal.Title>Ajustar Produto</Modal.Title></Modal.Header>
-                        <Modal.Body>
-                             <Form.Group className="mb-3"><Form.Label>Nome do Produto</Form.Label><Form.Control type="text" value={editData.nome} onChange={e => setEditData({...editData, nome: e.target.value})} /></Form.Group>
-                             <Row>
-                                 <Col>
-                                    <Form.Group className="mb-3"><Form.Label>Categoria</Form.Label><Form.Control type="text" value={editData.categoria} onChange={e => setEditData({...editData, categoria: e.target.value})} /></Form.Group>
-                                 </Col>
-                                 <Col>
-                                    <Form.Group className="mb-3"><Form.Label>Fabricante</Form.Label><Form.Select value={editData.industryId} onChange={e => setEditData({...editData, industryId: e.target.value})}><option value="">Selecione...</option>{industries.map(ind => <option key={ind.id} value={ind.id}>{ind.nomeFantasia}</option>)}</Form.Select></Form.Group>
-                                 </Col>
-                             </Row>
-                           <Form.Group>
-                               <Form.Label>Preço de Venda (Lote Principal)</Form.Label>
-                               <Form.Control type="number" value={editData.precoVenda} onChange={e => setEditData({...editData, precoVenda: e.target.value})} min="0" step="0.01" />
-                               <Form.Text>Este preço será aplicado ao lote mais antigo em estoque.</Form.Text>
-                           </Form.Group>
-                        </Modal.Body>
-                        <Modal.Footer>
-                            <Button variant="secondary" onClick={handleCloseModal}>Cancelar</Button>
-                            <Button variant="primary" onClick={handleSaveChanges}>Salvar Ajustes</Button>
-                        </Modal.Footer>
-                    </>
-                );
-            default:
-                return null;
+            const updatedProducts = allProducts.filter(p => !selectedProducts.has(p.id));
+            const updatedInventory = allInventory.filter(inv => !selectedProducts.has(inv.productId));
+            
+            setItem('products', updatedProducts);
+            setItem('inventory', updatedInventory);
+            
+            setShowDeleteModal(false);
+            setLastUpdated(Date.now());
+            alert(`${selectedProducts.size} produto(s) excluído(s).`);
+            
+        } catch (error) {
+            console.error('Erro ao excluir:', error);
+            alert('Erro ao excluir.');
         }
     };
 
-    if (!user) return <div>Carregando...</div>;
+    // Calcular margem de lucro
+    const calculateMargin = () => {
+        const custo = parseFloat(formData.custoMedio) || 0;
+        const preco = parseFloat(formData.precoVenda) || 0;
+        if (preco === 0) return 0; // Evitar divisão por zero se o preço for 0
+        return (((preco - custo) / preco) * 100).toFixed(2);
+    };
+
+    // Status do estoque
+    const getStockStatus = (stock) => {
+        if (stock === 0) return { variant: 'danger', text: 'Sem estoque', icon: <ExclamationTriangle /> };
+        if (stock <= 10) return { variant: 'warning', text: 'Estoque baixo', icon: <ExclamationTriangle /> };
+        return { variant: 'success', text: 'OK', icon: <CheckCircle /> };
+    };
+
+    if (!user) {
+        return <Container><p>Carregando...</p></Container>;
+    }
 
     return (
         <Container fluid>
-            <div className="d-flex justify-content-between align-items-center mb-3">
-                 <h1 className="h3 mb-0">Gestão de Estoque</h1>
-                 <Button variant="primary" onClick={() => handleOpenModal('novoProduto')}>
-                     <PlusCircleFill className="me-2"/>
-                     Cadastrar Novo Produto
-                 </Button>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 className="h3 mb-1">Gestão de Estoque</h1>
+                    <p className="text-muted mb-0">Gerencie seus produtos, estoques e preços</p>
+                </div>
+                <div>
+                    {selectedProducts.size > 0 && (
+                         <Button variant="danger" className="me-2" onClick={() => handleDelete()}>
+                            <Trash size={16} className="me-2" />
+                            Excluir ({selectedProducts.size})
+                        </Button>
+                    )}
+                    <Button variant="primary" onClick={handleCreate}>
+                        <Plus size={20} className="me-2" />
+                        Novo Produto
+                    </Button>
+                </div>
             </div>
 
+            {/* KPIs */}
+            <Row className="mb-4">
+                 <Col md={6} lg>
+                    <Card className="text-center">
+                        <Card.Body>
+                            <p className="text-muted small mb-1">Total de Produtos</p>
+                            <h4 className="mb-0">{stats.totalProducts}</h4>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col md={6} lg>
+                    <Card className="text-center">
+                        <Card.Body>
+                            <p className="text-muted small mb-1">Valor do Estoque</p>
+                            <h4 className="mb-0 text-success">R$ {stats.totalValue.toFixed(2)}</h4>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col md={6} lg>
+                    <Card className="text-center">
+                        <Card.Body>
+                            <p className="text-muted small mb-1">Custo do Estoque</p>
+                            <h4 className="mb-0 text-primary">R$ {stats.totalCost.toFixed(2)}</h4>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col md={3} lg>
+                    <Card className="text-center">
+                        <Card.Body>
+                            <p className="text-muted small mb-1">Estoque Baixo</p>
+                            <h4 className="mb-0 text-warning">{stats.lowStock}</h4>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col md={3} lg>
+                    <Card className="text-center">
+                        <Card.Body>
+                            <p className="text-muted small mb-1">Sem Estoque</p>
+                            <h4 className="mb-0 text-danger">{stats.outOfStock}</h4>
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
+
+            {/* Filtros */}
             <Card className="mb-4">
                 <Card.Body>
-                    <Row className="align-items-end">
-                        <Col md={4}><Form.Group><Form.Label>Filtrar por Categoria</Form.Label><Form.Select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}><option value="all">Todas as Categorias</option>{uniqueCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}</Form.Select></Form.Group></Col>
-                        <Col md={4}><Form.Group><Form.Label>Filtrar por Marca</Form.Label><Form.Select value={brandFilter} onChange={e => setBrandFilter(e.target.value)}><option value="all">Todas as Marcas</option>{uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}</Form.Select></Form.Group></Col>
+                    <Row>
+                        <Col md={4}>
+                            <InputGroup>
+                                <InputGroup.Text><Search /></InputGroup.Text>
+                                <Form.Control
+                                    placeholder="Buscar por nome, SKU ou marca..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </InputGroup>
+                        </Col>
+                        <Col md={2}>
+                            <Form.Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                                <option value="all">Todas as Categorias</option>
+                                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                            </Form.Select>
+                        </Col>
+                        <Col md={3}>
+                             <Form.Select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)}>
+                                <option value="all">Todos os Estoques</option>
+                                <option value="ok">Estoque OK</option>
+                                <option value="low">Estoque Baixo</option>
+                                <option value="out">Sem Estoque</option>
+                            </Form.Select>
+                        </Col>
+                        <Col md={3}>
+                            <Form.Select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+                                <option value="all">Todas as Origens</option>
+                                <option value="native">Cadastro Manual</option>
+                                <option value="imported">Importado via Planilha</option>
+                            </Form.Select>
+                        </Col>
                     </Row>
                 </Card.Body>
             </Card>
 
+            {/* Tabela de Produtos */}
             <Card>
-                <Table striped hover responsive className="mb-0 align-middle">
-                    <thead>
-                        <tr>
-                            <th>Produto</th>
-                            <th>Marca</th>
-                            <th className="text-center">Estoque Total</th>
-                            <th>
-                                Preço de Venda{' '}
-                                <OverlayTrigger placement="top" overlay={<Tooltip>Preço médio ponderado pelo estoque dos lotes disponíveis.</Tooltip>}>
-                                    <InfoCircleFill size={14} className="text-muted" />
-                                </OverlayTrigger>
-                            </th>
-                            <th>Margem Lucro/Un.</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredItems.map(item => (
-                            <React.Fragment key={item.productId}>
-                                <tr onClick={() => handleToggleExpand(item.productId)} style={{ cursor: 'pointer' }}>
-                                    <td><div>{item.nome}<small className="d-block text-muted">{item.sku}</small></div></td>
-                                    <td>{item.marca}</td>
-                                    <td className="text-center"><Badge bg={item.totalStock < 10 ? "danger" : "primary"} pill className="p-2 fs-6">{item.totalStock}</Badge></td>
-                                    <td>R$ {item.avgPrice.toFixed(2)}</td>
-                                    <td>R$ {item.profitMargin.toFixed(2)}</td>
-                                    <td>
-                                        <Button variant="outline-success" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenModal('entrada', item); }}>Entrada</Button>{' '}
-                                        <Button variant="outline-warning" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenModal('ajuste', item); }}>Ajustar</Button>{' '}
-                                        {/* --- NOVO BOTÃO DE EXCLUIR --- */}
-                                        <Button variant="outline-danger" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenModal('excluir', item); }}>
-                                            <Trash3Fill />
-                                        </Button>
-                                    </td>
+                <Card.Body className="p-0">
+                    <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                        <Table hover responsive className="mb-0 align-middle">
+                            <thead style={{ position: 'sticky', top: 0, backgroundColor: '#fff', zIndex: 1 }}>
+                                <tr>
+                                    <th style={{ width: '40px' }}>
+                                        <Form.Check 
+                                            type="checkbox"
+                                            checked={filteredInventory.length > 0 && selectedProducts.size === filteredInventory.length}
+                                            onChange={toggleSelectAll}
+                                        />
+                                    </th>
+                                    <th>Produto</th>
+                                    <th>SKU</th>
+                                    <th>Categoria</th>
+                                    <th>Marca</th>
+                                    <th className="text-center">Estoque</th>
+                                    <th className="text-end">Custo</th>
+                                    <th className="text-end">Preço</th>
+                                    <th className="text-end">Margem</th>
+                                    <th className="text-center">Status</th>
+                                    <th className="text-center">Ações</th>
                                 </tr>
-                                {item.isExpanded && <ProductDetailRow item={item} />}
-                           </React.Fragment>
-                        ))}
-                    </tbody>
-                </Table>
+                            </thead>
+                            <tbody>
+                                {filteredInventory.length === 0 ? (
+                                    <tr><td colSpan="11" className="text-center text-muted py-4">Nenhum produto encontrado</td></tr>
+                                ) : (
+                                    filteredInventory.map(item => {
+                                        const margin = item.avgPrice > 0
+                                            ? (((item.avgPrice - item.avgCost) / item.avgPrice) * 100).toFixed(1)
+                                            : 0;
+                                        const status = getStockStatus(item.totalStock);
+
+                                        return (
+                                            <tr key={item.productId} className={selectedProducts.has(item.productId) ? 'table-primary' : ''}>
+                                                <td>
+                                                    <Form.Check 
+                                                        type="checkbox"
+                                                        checked={selectedProducts.has(item.productId)}
+                                                        onChange={() => toggleSelect(item.productId)}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <div>
+                                                        <div className="fw-semibold">{item.nome}</div>
+                                                        {item.nextExpiryDate && (<small className="text-muted">Val: {new Date(item.nextExpiryDate).toLocaleDateString('pt-BR')}</small>)}
+                                                    </div>
+                                                </td>
+                                                <td><small className="font-monospace">{item.sku}</small></td>
+                                                <td><Badge bg="secondary">{item.categoria}</Badge></td>
+                                                <td>{item.marca}</td>
+                                                <td className="text-center"><span className={item.totalStock <= 10 ? 'fw-bold' : ''}>{item.totalStock}</span></td>
+                                                <td className="text-end">R$ {item.avgCost.toFixed(2)}</td>
+                                                <td className="text-end fw-bold">R$ {item.avgPrice.toFixed(2)}</td>
+                                                <td className="text-end">{margin}%</td>
+                                                <td className="text-center">
+                                                    <Badge bg={status.variant} className="d-flex align-items-center justify-content-center gap-1" style={{ fontSize: '0.75rem' }}>
+                                                        {status.icon} {status.text}
+                                                    </Badge>
+                                                </td>
+                                                <td className="text-center">
+                                                    <div className="d-flex gap-2 justify-content-center">
+                                                        <Button variant="outline-primary" size="sm" onClick={() => handleEdit(item)}><PencilSquare size={14} /></Button>
+                                                        <Button variant="outline-danger" size="sm" onClick={() => handleDelete(item)}><Trash size={14} /></Button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </Table>
+                    </div>
+                </Card.Body>
             </Card>
 
-            <Modal show={showModal} onHide={handleCloseModal} centered>
-                {renderModalContent()}
+            {/* Modal de Criar/Editar */}
+            <Modal show={showModal} onHide={() => setShowModal(false)} size="lg">
+                 <Modal.Header closeButton>
+                    <Modal.Title>{modalMode === 'create' ? 'Cadastrar Novo Produto' : 'Editar Produto'}</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form>
+                        <Row>
+                            <Col md={8}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Nome do Produto *</Form.Label>
+                                    <Form.Control type="text" name="nome" value={formData.nome} onChange={handleFormChange} isInvalid={!!formErrors.nome}/>
+                                    <Form.Control.Feedback type="invalid">{formErrors.nome}</Form.Control.Feedback>
+                                </Form.Group>
+                            </Col>
+                            <Col md={4}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>SKU *</Form.Label>
+                                    <Form.Control type="text" name="sku" value={formData.sku} onChange={handleFormChange} isInvalid={!!formErrors.sku} />
+                                    <Form.Control.Feedback type="invalid">{formErrors.sku}</Form.Control.Feedback>
+                                </Form.Group>
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Categoria *</Form.Label>
+                                    <Form.Select name="categoria" value={formData.categoria} onChange={handleFormChange}>
+                                        <option value="Alimentos">Alimentos</option> <option value="Bebidas">Bebidas</option>
+                                        <option value="Limpeza">Limpeza</option> <option value="Higiene">Higiene</option>
+                                        <option value="Outros">Outros</option>
+                                    </Form.Select>
+                                </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Marca *</Form.Label>
+                                    <Form.Control type="text" name="marca" value={formData.marca} onChange={handleFormChange} isInvalid={!!formErrors.marca} placeholder="Ex: Coca-Cola, Nestlé..."/>
+                                    <Form.Control.Feedback type="invalid">{formErrors.marca}</Form.Control.Feedback>
+                                </Form.Group>
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col md={4}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Estoque Atual *</Form.Label>
+                                    <Form.Control type="number" name="estoque" value={formData.estoque} onChange={handleFormChange} min="0" isInvalid={!!formErrors.estoque}/>
+                                    <Form.Control.Feedback type="invalid">{formErrors.estoque}</Form.Control.Feedback>
+                                </Form.Group>
+                            </Col>
+                            <Col md={4}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Custo Médio (R$) *</Form.Label>
+                                    <Form.Control type="number" step="0.01" name="custoMedio" value={formData.custoMedio} onChange={handleFormChange} min="0" isInvalid={!!formErrors.custoMedio}/>
+                                    <Form.Control.Feedback type="invalid">{formErrors.custoMedio}</Form.Control.Feedback>
+                                </Form.Group>
+                            </Col>
+                             <Col md={4}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Preço de Venda (R$) *</Form.Label>
+                                    <Form.Control type="number" step="0.01" name="precoVenda" value={formData.precoVenda} onChange={handleFormChange} min="0" isInvalid={!!formErrors.precoVenda}/>
+                                    <Form.Control.Feedback type="invalid">{formErrors.precoVenda}</Form.Control.Feedback>
+                                </Form.Group>
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Data de Validade</Form.Label>
+                                    <Form.Control type="date" name="dataValidade" value={formData.dataValidade} onChange={handleFormChange}/>
+                                    <Form.Text className="text-muted">Opcional - deixe em branco se não aplicável</Form.Text>
+                                </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                                 <Form.Group className="mb-3">
+                                    <Form.Label>Margem de Lucro</Form.Label>
+                                    <Form.Control type="text" value={`${calculateMargin()}%`} disabled/>
+                                    <Form.Text className="text-muted">Calculado sobre o preço de venda</Form.Text>
+                                </Form.Group>
+                            </Col>
+                        </Row>
+                        <Alert variant="info" className="mb-0">
+                            <small><strong>Dica:</strong> A margem de lucro é calculada como: ((Preço de Venda - Custo) / Preço de Venda) × 100</small>
+                        </Alert>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowModal(false)}>Cancelar</Button>
+                    <Button variant="primary" onClick={handleSave}>{modalMode === 'create' ? 'Cadastrar' : 'Salvar Alterações'}</Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* Modal de Exclusão */}
+            <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>Confirmar Exclusão</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Alert variant="danger" className="mb-3">
+                        <strong>⚠️ Atenção!</strong> Esta ação não pode ser desfeita.
+                    </Alert>
+                    <p>
+                        Você está prestes a excluir <strong>{selectedProducts.size}</strong> produto(s).
+                        Tem certeza que deseja continuar?
+                    </p>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancelar</Button>
+                    <Button variant="danger" onClick={confirmDelete}><Trash className="me-2" />Sim, Excluir</Button>
+                </Modal.Footer>
             </Modal>
         </Container>
     );
