@@ -20,7 +20,18 @@ const TraditionalPOS = () => {
 
   const [showNewClientModal, setShowNewClientModal] = useState(false);
   const [newClient, setNewClient] = useState({ nome: '', sexo: 'Prefiro não informar', idade: '' });
-  const [clientList, setClientList] = useState(() => user ? getClientsByRetailer(user.actorId) : []);
+  
+  // --- CORREÇÃO APLICADA AQUI ---
+  const [clientList, setClientList] = useState([]);
+
+  // Carrega a lista de clientes assim que o usuário estiver disponível
+  useEffect(() => {
+    if (user) {
+      setClientList(getClientsByRetailer(user.actorId));
+    }
+  }, [user]);
+  // --- FIM DA CORREÇÃO ---
+
 
   // Recarrega o inventário quando uma venda é finalizada
   const inventory = useMemo(() => user ? getInventoryByRetailer(user.actorId) : [], [user, lastUpdated]);
