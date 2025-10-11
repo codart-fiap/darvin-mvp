@@ -6,13 +6,14 @@ import { getItem, setItem } from '../../state/storage.js';
 import { generateId } from '../../utils/ids.js';
 import {
     Container, Row, Col, Card, Table, Button, Form,
-    Modal, Alert, Badge, InputGroup, Collapse, Nav, Tab
+    Modal, Alert, Badge, InputGroup, Collapse, Nav, Tab,
+    OverlayTrigger, Tooltip // --- COMPONENTES ADICIONADOS AQUI ---
 } from 'react-bootstrap';
 import {
     Search, Plus, PencilSquare, Trash,
     ExclamationTriangle, CheckCircle, ChevronDown, ChevronUp,
     BarChartLineFill, CalendarCheckFill, CashCoin, CheckAll,
-    PlusCircle // --- ÍCONE ADICIONADO AQUI ---
+    PlusCircle, InfoCircleFill // --- ÍCONE ADICIONADO AQUI ---
 } from 'react-bootstrap-icons';
 
 
@@ -113,7 +114,8 @@ const CollapsibleRow = ({ item, selected, onSelect, expanded, onToggle, onEdit, 
                                                 <Col xs={6} className="text-center">
                                                     <CashCoin size={24} className="text-success"/>
                                                     <div className="fw-bold">R$ {item.salesDetails.averagePrice.toFixed(2)}</div>
-                                                    <small className="text-muted">Preço Médio</small>
+                                                    {/* --- CORREÇÃO DE LABEL APLICADA ANTERIORMENTE --- */}
+                                                    <small className="text-muted">Preço Médio (Vendas 30d)</small>
                                                 </Col>
                                                  <Col xs={6} className="text-center">
                                                     <CashCoin size={24} className="text-success"/>
@@ -161,6 +163,10 @@ const Inventory = () => {
     const [lastUpdated, setLastUpdated] = useState(Date.now());
     const [activeBatchId, setActiveBatchId] = useState(null);
 
+    // --- NOVA FUNÇÃO HELPER PARA TOOLTIPS ---
+    const renderTooltip = (text) => (
+        <Tooltip>{text}</Tooltip>
+    );
 
     useEffect(() => {
         if (user) { loadInventory(); }
@@ -453,8 +459,27 @@ const Inventory = () => {
                                 <tr>
                                     <th style={{ width: '40px' }}><Form.Check type="checkbox" checked={filteredInventory.length > 0 && selectedProducts.size === filteredInventory.length} onChange={toggleSelectAll}/></th>
                                     <th>Produto</th><th>SKU</th><th>Categoria</th><th>Marca</th>
-                                    <th className="text-center">Estoque</th><th className="text-end">Custo</th>
-                                    <th className="text-end">Preço</th><th className="text-end">Margem</th>
+                                    <th className="text-center">Estoque</th>
+                                    {/* --- CORREÇÕES DE UI APLICADAS AQUI --- */}
+                                    <th className="text-end">
+                                        Custo Médio (Estoque){' '}
+                                        <OverlayTrigger
+                                            placement="top"
+                                            overlay={renderTooltip('Custo médio ponderado de todos os lotes em estoque. Clique na linha para ver os detalhes.')}
+                                        >
+                                            <InfoCircleFill size={12} className="text-muted" style={{ cursor: 'help' }} />
+                                        </OverlayTrigger>
+                                    </th>
+                                    <th className="text-end">
+                                        Preço Médio (Estoque){' '}
+                                        <OverlayTrigger
+                                            placement="top"
+                                            overlay={renderTooltip('Preço de venda médio ponderado de todos os lotes em estoque. Clique na linha para ver os detalhes.')}
+                                        >
+                                            <InfoCircleFill size={12} className="text-muted" style={{ cursor: 'help' }} />
+                                        </OverlayTrigger>
+                                    </th>
+                                    <th className="text-end">Margem</th>
                                     <th className="text-center">Status</th><th className="text-center">Ações</th>
                                 </tr>
                             </thead>

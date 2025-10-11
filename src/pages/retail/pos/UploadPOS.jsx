@@ -7,7 +7,7 @@ import { getInventoryByRetailer } from '../../../state/selectors';
 import { setItem, getItem } from '../../../state/storage';
 import { generateId } from '../../../utils/ids';
 import { Container, Button, Alert, Table, Row, Col, Form, Card, Modal, Badge } from 'react-bootstrap';
-import { GripVertical, CheckCircleFill, XCircleFill, DashCircleFill, PlusCircle } from 'react-bootstrap-icons';
+import { GripVertical, CheckCircleFill, XCircleFill, DashCircleFill, PlusCircle, ArrowRight } from 'react-bootstrap-icons';
 
 const PLATFORM_FIELDS = [
     { key: 'product_sku', name: 'SKU do Produto', required: true },
@@ -22,16 +22,16 @@ const UploadPOS = () => {
     const [step, setStep] = useState('upload');
     const [fileHeaders, setFileHeaders] = useState([]);
     const [fileRawData, setFileRawData] = useState([]);
-    const [columnMap, setColumnMap] = useState({});
+    // --- O ESTADO columnMap FOI REMOVIDO ---
     const [columnOrder, setColumnOrder] = useState([...PLATFORM_FIELDS]);
     const [validationResults, setValidationResults] = useState({ all: [], valid: [], newProduct: [], error: [] });
     const [error, setError] = useState('');
     const [isDragging, setIsDragging] = useState(false);
     const [draggedIndex, setDraggedIndex] = useState(null);
     const fileInputRef = useRef(null);
-    const [lastUpdated, setLastUpdated] = useState(Date.now()); // --- ADICIONADO PARA ATUALIZAÇÃO ---
+    const [lastUpdated, setLastUpdated] = useState(Date.now());
 
-    const inventory = useMemo(() => user ? getInventoryByRetailer(user.actorId) : [], [user, lastUpdated]); // --- DEPENDÊNCIA ADICIONADA ---
+    const inventory = useMemo(() => user ? getInventoryByRetailer(user.actorId) : [], [user, lastUpdated]);
 
     const parseDate = (dateString) => {
         if (dateString instanceof Date && !isNaN(dateString)) return dateString;
@@ -76,7 +76,7 @@ const UploadPOS = () => {
         setStep('upload'); 
         setFileHeaders([]); 
         setFileRawData([]); 
-        setColumnMap({});
+        // --- columnMap resetado ---
         setColumnOrder([...PLATFORM_FIELDS]);
         setValidationResults({ all: [], valid: [], newProduct: [], error: [] }); 
         setError('');
@@ -107,7 +107,7 @@ const UploadPOS = () => {
                 );
                 setFileHeaders(headers);
                 setFileRawData(rawData);
-                autoMapColumns(headers);
+                // --- A FUNÇÃO autoMapColumns FOI REMOVIDA ---
                 setStep('mapping');
             } catch (e) {
                 console.error('Erro ao processar arquivo:', e);
@@ -117,28 +117,7 @@ const UploadPOS = () => {
         reader.readAsBinaryString(file);
     };
 
-    const autoMapColumns = (headers) => {
-        const newMap = {};
-        const normalizedHeaders = headers.map(h => h.toLowerCase().replace(/[_\s-]+/g, ''));
-        
-        const mappings = {
-            product_sku: ['sku', 'codigo', 'produto', 'codigoproduto', 'skuproduto'],
-            sale_date: ['data', 'datavenda', 'date', 'datetime', 'datahora'],
-            quantity: ['quantidade', 'qtd', 'qtde', 'quantity', 'quant'],
-            unit_price: ['preco', 'precovenda', 'valor', 'price', 'precounitario', 'valorunitario'],
-            transaction_id: ['id', 'idvenda', 'transacao', 'pedido', 'numpedido', 'numvenda']
-        };
-
-        PLATFORM_FIELDS.forEach(field => {
-            const keywords = mappings[field.key];
-            const foundIndex = normalizedHeaders.findIndex(h => 
-                keywords.some(keyword => h.includes(keyword))
-            );
-            newMap[field.key] = foundIndex >= 0 ? headers[foundIndex] : '';
-        });
-        
-        setColumnMap(newMap);
-    };
+    // --- A FUNÇÃO autoMapColumns FOI REMOVIDA ---
 
     const handleDragStart = (e, index) => {
         setDraggedIndex(index);
@@ -162,25 +141,22 @@ const UploadPOS = () => {
         setDraggedIndex(null);
     };
 
+    // --- LÓGICA DE VALIDAÇÃO ATUALIZADA ---
     const handleValidation = () => {
         setError('');
+        
+        // Mapeamento agora é posicional, baseado na ordem de 'columnOrder'
         const mappedIndices = {};
-        
-        for (const field of PLATFORM_FIELDS.filter(f => f.required)) {
-            if (!columnMap[field.key]) {
-                setError(`O campo obrigatório "${field.name}" precisa ser mapeado.`);
-                return;
-            }
-            mappedIndices[field.key] = fileHeaders.indexOf(columnMap[field.key]);
-        }
-        
-        for (const field of PLATFORM_FIELDS.filter(f => !f.required)) {
-            if (columnMap[field.key]) {
-                mappedIndices[field.key] = fileHeaders.indexOf(columnMap[field.key]);
-            }
+        columnOrder.forEach((field, index) => {
+            mappedIndices[field.key] = index;
+        });
+
+        if (fileHeaders.length < PLATFORM_FIELDS.filter(f => f.required).length) {
+            setError('Sua planilha não tem colunas suficientes para os campos obrigatórios.');
+            return;
         }
 
-        const hasTransactionId = mappedIndices.transaction_id !== undefined && columnMap.transaction_id;
+        const hasTransactionId = columnOrder.some(f => f.key === 'transaction_id');
         const results = { all: [], valid: [], newProduct: [], error: [], hasTransactionId };
         
         fileRawData.forEach((row, index) => {
@@ -317,8 +293,6 @@ const UploadPOS = () => {
             case 'mapping': 
                 return <MappingStep 
                     headers={fileHeaders} 
-                    map={columnMap} 
-                    setMap={setColumnMap} 
                     columnOrder={columnOrder}
                     handleDragStart={handleDragStart}
                     handleDragOver={handleDragOver}
@@ -337,7 +311,7 @@ const UploadPOS = () => {
                     onCancel={() => setStep('mapping')}
                     user={user}
                     inventory={inventory}
-                    setLastUpdated={setLastUpdated} // --- PROP ADICIONADA ---
+                    setLastUpdated={setLastUpdated}
                 />;
             default: 
                 return <UploadStep 
@@ -409,34 +383,23 @@ const UploadStep = ({ processFile, isDragging, setIsDragging, fileInputRef }) =>
     );
 };
 
-const MappingStep = ({ headers, map, setMap, columnOrder, handleDragStart, handleDragOver, handleDragEnd, draggedIndex, onVerify, onCancel, error, setError }) => {
-    const handleSelectChange = (platformKey, selectedHeader) => {
-        setMap(prevMap => ({ ...prevMap, [platformKey]: selectedHeader }));
-    };
-
-    const mappedRequired = columnOrder.filter(f => f.required && map[f.key]).length;
-    const totalRequired = columnOrder.filter(f => f.required).length;
+// --- COMPONENTE MappingStep ATUALIZADO ---
+const MappingStep = ({ headers, columnOrder, handleDragStart, handleDragOver, handleDragEnd, draggedIndex, onVerify, onCancel, error, setError }) => {
 
     return (
-        <Container className="py-4">
+        <Container className="py-4" style={{ maxWidth: '900px' }}>
             {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
             
-            <div className="mb-4">
-                <h2>Mapear Colunas</h2>
-                <p className="text-muted">Arraste para reordenar e mapeie as colunas da sua planilha</p>
+            <div className="mb-4 text-center">
+                <h2>Organizar Colunas</h2>
+                <p className="text-muted">Arraste os campos do sistema para que a ordem deles corresponda à ordem das colunas da sua planilha.</p>
             </div>
 
             <Row>
-                <Col lg={8}>
+                <Col md={7}>
                     <Card>
+                        <Card.Header as="h5">Campos do Sistema</Card.Header>
                         <Card.Body>
-                            <div className="d-flex justify-content-between align-items-center mb-3">
-                                <h5 className="mb-0">Colunas do Sistema</h5>
-                                <Badge bg={mappedRequired === totalRequired ? 'success' : 'warning'}>
-                                    {mappedRequired}/{totalRequired} obrigatórios
-                                </Badge>
-                            </div>
-                            
                             {columnOrder.map((field, index) => (
                                 <div 
                                     key={field.key}
@@ -444,74 +407,45 @@ const MappingStep = ({ headers, map, setMap, columnOrder, handleDragStart, handl
                                     onDragStart={(e) => handleDragStart(e, index)}
                                     onDragOver={(e) => handleDragOver(e, index)}
                                     onDragEnd={handleDragEnd}
-                                    className="mb-3 p-3 border rounded"
+                                    className="mb-2 p-3 border rounded"
                                     style={{ 
-                                        backgroundColor: draggedIndex === index ? '#e7f1ff' : '#f8f9fa',
+                                        backgroundColor: draggedIndex === index ? '#e7f1ff' : '#fff',
                                         cursor: 'grab',
-                                        transition: 'all 0.2s'
+                                        transition: 'background-color 0.2s'
                                     }}
                                 >
-                                    <Row className="align-items-center">
-                                        <Col xs="auto">
-                                            <GripVertical size={24} className="text-secondary" />
-                                        </Col>
-                                        <Col xs={1} className="text-center">
-                                            <Badge bg="primary" style={{ fontSize: '1.1rem', padding: '8px 12px' }}>
-                                                {index + 1}
-                                            </Badge>
-                                        </Col>
-                                        <Col xs={3}>
-                                            <div>
-                                                <strong>{field.name}</strong>
-                                                <br/>
-                                                {field.required ? (
-                                                    <Badge bg="danger" className="mt-1">Obrigatório</Badge>
-                                                ) : (
-                                                    <Badge bg="secondary" className="mt-1">Opcional</Badge>
-                                                )}
-                                            </div>
-                                        </Col>
-                                        <Col>
-                                            <Form.Select 
-                                                value={map[field.key] || ''} 
-                                                onChange={(e) => handleSelectChange(field.key, e.target.value)}
-                                                className={map[field.key] ? 'border-success border-2' : ''}
-                                                size="lg"
-                                            >
-                                                <option value="">Selecione...</option>
-                                                {headers.map((header, idx) => (
-                                                    <option key={idx} value={header}>{header}</option>
-                                                ))}
-                                            </Form.Select>
-                                        </Col>
-                                    </Row>
+                                    <div className="d-flex align-items-center">
+                                        <GripVertical size={24} className="text-secondary me-3" />
+                                        <div>
+                                            <strong>{field.name}</strong>
+                                            <br/>
+                                            {field.required ? (
+                                                <Badge bg="danger">Obrigatório</Badge>
+                                            ) : (
+                                                <Badge bg="secondary">Opcional</Badge>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             ))}
                         </Card.Body>
                     </Card>
                 </Col>
                 
-                <Col lg={4}>
+                <Col md={5}>
                     <Card className="bg-light border-primary">
+                        <Card.Header as="h5">Colunas da sua Planilha</Card.Header>
                         <Card.Body>
-                            <h6 className="mb-3">📋 Instruções</h6>
-                            <ul className="small mb-3">
-                                <li>Arraste os campos para reordenar</li>
-                                <li>Mapeie todos os campos obrigatórios</li>
-                                <li>ID da Venda é opcional (será gerado)</li>
-                            </ul>
-                            <hr/>
-                            <h6 className="mb-3">✅ Status do Mapeamento</h6>
-                            {columnOrder.map(field => (
-                                <div key={field.key} className="d-flex justify-content-between align-items-center mb-2 p-2 bg-white rounded">
-                                    <small className="fw-medium">{field.name}</small>
-                                    {map[field.key] ? (
-                                        <CheckCircleFill size={18} className="text-success" />
-                                    ) : field.required ? (
-                                        <XCircleFill size={18} className="text-danger" />
-                                    ) : (
-                                        <DashCircleFill size={18} className="text-secondary" />
-                                    )}
+                             {columnOrder.map((field, index) => (
+                                <div key={field.key} className="d-flex align-items-center mb-2 p-3 bg-white rounded border">
+                                    <Badge bg="primary" className="me-3" style={{ fontSize: '1.1rem', padding: '8px 12px' }}>
+                                        {index + 1}
+                                    </Badge>
+                                    <div>
+                                        <small className="text-muted d-block">Coluna {index + 1} será mapeada para:</small>
+                                        <strong className="d-block">{field.name}</strong>
+                                        <span className="text-success">{headers[index] || <span className='text-danger'>Coluna não encontrada</span>}</span>
+                                    </div>
                                 </div>
                             ))}
                         </Card.Body>
@@ -527,7 +461,6 @@ const MappingStep = ({ headers, map, setMap, columnOrder, handleDragStart, handl
                     variant="primary" 
                     size="lg" 
                     onClick={onVerify}
-                    disabled={mappedRequired < totalRequired}
                 >
                     Validar Dados →
                 </Button>
@@ -535,6 +468,7 @@ const MappingStep = ({ headers, map, setMap, columnOrder, handleDragStart, handl
         </Container>
     );
 };
+
 
 const ValidationStep = ({ results, setValidationResults, onConfirm, onCancel, user, inventory, setLastUpdated }) => {
     const [showLinkModal, setShowLinkModal] = useState(false);

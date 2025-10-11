@@ -30,11 +30,14 @@ export const getInventoryByRetailer = (retailerId) => {
     const industries = getItem('industries') || [];
     const sales = getSalesByRetailer(retailerId);
 
-    // --- OTIMIZAÇÃO: Pré-calcula as métricas de vendas para todos os produtos de uma só vez ---
+    // --- CORREÇÃO APLICADA AQUI ---
     const salesMetrics = {};
     const cutoffDate = subDays(new Date(), 30);
+    // 1. Cria uma variável para armazenar apenas as vendas dos últimos 30 dias.
+    const salesInPeriod = sales.filter(s => new Date(s.dataISO) >= cutoffDate);
 
-    sales.filter(s => new Date(s.dataISO) >= cutoffDate).forEach(sale => {
+    // 2. Usa essa variável para calcular as unidades vendidas e a receita.
+    salesInPeriod.forEach(sale => {
         sale.itens.forEach(item => {
             if (!salesMetrics[item.productId]) {
                 salesMetrics[item.productId] = { salesCount: 0, quantitySold: 0, totalRevenue: 0 };
@@ -43,10 +46,14 @@ export const getInventoryByRetailer = (retailerId) => {
             salesMetrics[item.productId].totalRevenue += item.qtde * item.precoUnit;
         });
     });
-    // Contagem de vendas separada para não duplicar
-     Object.keys(salesMetrics).forEach(productId => {
-        salesMetrics[productId].salesCount = sales.filter(s => s.itens.some(i => i.productId === productId)).length;
+
+    // 3. Usa a MESMA variável para contar o número de transações, garantindo consistência.
+    Object.keys(salesMetrics).forEach(productId => {
+        salesMetrics[productId].salesCount = salesInPeriod.filter(s =>
+            s.itens.some(i => i.productId === productId)
+        ).length;
     });
+    // --- FIM DA CORREÇÃO ---
 
     const retailerInventory = inventory.filter(item => item.retailerId === retailerId);
     
@@ -123,7 +130,7 @@ export const getDashboardData = (retailerId, days = 30, categoryFilter = null, d
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
-    let periodSales = sales.filter(s => new Date(s.dataISO) >= cutoffDate);
+    const periodSales = sales.filter(s => new Date(s.dataISO) >= cutoffDate);
     let filteredSales = periodSales;
 
     if (dateFilter) {
@@ -172,7 +179,10 @@ export const getDashboardData = (retailerId, days = 30, categoryFilter = null, d
     const revenueByCategory = Object.keys(revenueByCategoryMap).map(c => ({ name: c, Receita: revenueByCategoryMap[c] }));
 
     const productSalesMap = {};
-    filteredSales.forEach(s => {
+    // --- CORREÇÃO APLICADA AQUI ---
+    // A lógica agora usa 'periodSales' para garantir que a contagem seja sempre baseada
+    // nos dados originais do período, evitando o reuso de dados já filtrados por categoria.
+    periodSales.forEach(s => {
         s.itens.forEach(i => {
             const product = products.find(p => p.id === i.productId);
             const industry = industries.find(ind => ind.id === product?.industryId);
