@@ -29,6 +29,9 @@ const UploadPOS = () => {
     const [isDragging, setIsDragging] = useState(false);
     const [draggedIndex, setDraggedIndex] = useState(null);
     const fileInputRef = useRef(null);
+    const [lastUpdated, setLastUpdated] = useState(Date.now()); // --- ADICIONADO PARA ATUALIZAÇÃO ---
+
+    const inventory = useMemo(() => user ? getInventoryByRetailer(user.actorId) : [], [user, lastUpdated]); // --- DEPENDÊNCIA ADICIONADA ---
 
     const parseDate = (dateString) => {
         if (dateString instanceof Date && !isNaN(dateString)) return dateString;
@@ -68,8 +71,6 @@ const UploadPOS = () => {
             if (el) el.remove(); 
         };
     }, []);
-
-    const inventory = useMemo(() => user ? getInventoryByRetailer(user.actorId) : [], [user]);
 
     const resetForNewUpload = () => {
         setStep('upload'); 
@@ -258,14 +259,13 @@ const UploadPOS = () => {
         const newSales = Object.values(groupedSales).map(group => {
             const total = group.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
             
-            // --- CORREÇÃO APLICADA AQUI ---
             const clienteId = 'consumidor_final_' + user.actorId;
 
             return {
                 id: generateId(), 
                 retailerId: user.actorId, 
                 dataISO: group.saleDate.toISOString(),
-                clienteId: clienteId, // Corrigido
+                clienteId: clienteId,
                 itens: group.items.map(item => ({
                     productId: item.product?.productId || item.product?.id,
                     sku: item.product?.sku || item.productSku || 'SKU-UNKNOWN',
@@ -337,6 +337,7 @@ const UploadPOS = () => {
                     onCancel={() => setStep('mapping')}
                     user={user}
                     inventory={inventory}
+                    setLastUpdated={setLastUpdated} // --- PROP ADICIONADA ---
                 />;
             default: 
                 return <UploadStep 
@@ -535,7 +536,7 @@ const MappingStep = ({ headers, map, setMap, columnOrder, handleDragStart, handl
     );
 };
 
-const ValidationStep = ({ results, setValidationResults, onConfirm, onCancel, user, inventory }) => {
+const ValidationStep = ({ results, setValidationResults, onConfirm, onCancel, user, inventory, setLastUpdated }) => {
     const [showLinkModal, setShowLinkModal] = useState(false);
     const [selectedRow, setSelectedRow] = useState(null);
     const [linkMode, setLinkMode] = useState('existing'); // 'existing' or 'new'
@@ -639,6 +640,9 @@ const ValidationStep = ({ results, setValidationResults, onConfirm, onCancel, us
             
             setItem('inventory', [...allInventory, newInventoryItem]);
             
+            // --- CORREÇÃO: Força a atualização do inventário no componente pai ---
+            setLastUpdated(Date.now());
+
             const productForUpdate = {
                 productId: productId,
                 sku: newProductForm.sku,
