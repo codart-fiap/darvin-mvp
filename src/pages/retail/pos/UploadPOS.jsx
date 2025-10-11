@@ -318,8 +318,38 @@ const UploadPOS = () => {
     
     const handleFinalImport = () => {
         const allSales = getItem('sales') || [];
+        const allInventory = getItem('inventory') || [];
         
         const groupedSales = groupTransactions(validationResults.valid, validationResults.groupingStrategy);
+        
+        // ✅ CORREÇÃO: Mapeia quantidades vendidas por productId para desconto de estoque
+        const quantitiesSoldByProduct = {};
+        
+        validationResults.valid.forEach(item => {
+            const productId = item.product?.productId || item.product?.id;
+            if (productId) {
+                quantitiesSoldByProduct[productId] = (quantitiesSoldByProduct[productId] || 0) + item.quantity;
+            }
+        });
+        
+        // ✅ CORREÇÃO: Desconta as quantidades vendidas do estoque usando FIFO
+        const updatedInventory = allInventory.map(invItem => {
+            const soldQty = quantitiesSoldByProduct[invItem.productId];
+            
+            if (soldQty && soldQty > 0) {
+                const newStock = Math.max(0, invItem.estoque - soldQty);
+                quantitiesSoldByProduct[invItem.productId] = Math.max(0, soldQty - invItem.estoque);
+                
+                return {
+                    ...invItem,
+                    estoque: newStock
+                };
+            }
+            
+            return invItem;
+        });
+        
+        setItem('inventory', updatedInventory);
         
         const newSales = groupedSales.map(group => {
             const total = group.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
@@ -331,7 +361,6 @@ const UploadPOS = () => {
                 clienteId: 'consumidor_final',
                 itens: group.items.map(item => ({
                     productId: item.product?.productId || item.product?.id,
-                    // ✅ CORREÇÃO: Usa o SKU do produto encontrado ou o da planilha (já limpo)
                     sku: item.product?.sku || item.productSku || 'SKU-UNKNOWN',
                     qtde: item.quantity, 
                     precoUnit: item.unitPrice,
@@ -353,8 +382,8 @@ const UploadPOS = () => {
         setItem('sales', [...allSales, ...newSales]);
         
         const message = validationResults.groupingStrategy === 'transaction_id'
-            ? `${newSales.length} vendas foram registradas com sucesso!`
-            : `${newSales.length} vendas foram registradas (agrupadas por data/hora).`;
+            ? `${newSales.length} vendas foram registradas com sucesso! O estoque foi atualizado.`
+            : `${newSales.length} vendas foram registradas (agrupadas por data/hora). O estoque foi atualizado.`;
         
         alert(message);
         resetForNewUpload();
