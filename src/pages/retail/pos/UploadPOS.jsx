@@ -1,4 +1,4 @@
-// --- ARQUIVO COMPLETO: src/pages/retail/pos/UploadPOS.jsx ---
+// --- ARQUIVO CORRIGIDO: src/pages/retail/pos/UploadPOS.jsx ---
 // --- TECNOLOGIA: React, JSX, JavaScript ---
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -19,7 +19,7 @@ const PLATFORM_FIELDS = [
 
 const UploadPOS = () => {
     const { user } = useAuth();
-    const [step, setStep] = useState('upload'); 
+    const [step, setStep] = useState('upload');
     const [fileHeaders, setFileHeaders] = useState([]);
     const [fileRawData, setFileRawData] = useState([]);
     const [columnMap, setColumnMap] = useState({});
@@ -258,11 +258,14 @@ const UploadPOS = () => {
         const newSales = Object.values(groupedSales).map(group => {
             const total = group.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
             
+            // --- CORREÇÃO APLICADA AQUI ---
+            const clienteId = 'consumidor_final_' + user.actorId;
+
             return {
                 id: generateId(), 
                 retailerId: user.actorId, 
                 dataISO: group.saleDate.toISOString(),
-                clienteId: 'consumidor_final',
+                clienteId: clienteId, // Corrigido
                 itens: group.items.map(item => ({
                     productId: item.product?.productId || item.product?.id,
                     sku: item.product?.sku || item.productSku || 'SKU-UNKNOWN',
