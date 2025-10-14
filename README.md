@@ -1,5 +1,7 @@
 Darvin MVP
-O Projeto
+
+
+
 O Darvin MVP (Minimum Viable Product) é uma plataforma de business intelligence e ponto de venda (PDV) desenvolvida como solução para o Challenge 2025 da FIAP, em parceria com a empresa Astéria. A aplicação foi projetada para resolver um dos grandes desafios enfrentados pela indústria e pelo pequeno varejo: a coleta e análise de dados de sell-out.
 
 
@@ -127,44 +129,3 @@ npm run dev
 A aplicação estará disponível em http://localhost:5173.
 
 
-
-Estrutura de Arquivos
-
-/src
-|-- /assets
-|   |-- /css
-|   |-- /images
-|-- /components
-|   |-- ProtectedRoute.jsx
-|   |-- Sidebar.jsx
-|-- /hooks
-|   |-- useAuth.js
-|-- /layouts
-|   |-- AppLayout.jsx
-|-- /pages
-|   |-- /auth
-|   |   |-- Login.jsx
-|   |-- /industry
-|   |   |-- DarvinVision.jsx
-|   |   |-- DashboardIndustry.jsx
-|   |   |-- ProgramsIndustry.jsx
-|   |-- /retail
-|   |   |-- /pos
-|   |   |   |-- OnlineSheetPOS.jsx
-|   |   |   |-- SalesHistory.jsx
-|   |   |   |-- TraditionalPOS.jsx
-|   |   |   |-- UploadPOS.jsx
-|   |   |-- Assistant.jsx
-|   |   |-- DashboardRetail.jsx
-|   |   |-- Inventory.jsx
-|   |   |-- Programs.jsx
-|   |   |-- SettingsRetail.jsx
-|-- /state
-|   |-- seed.js
-|   |-- selectors.js
-|   |-- storage.js
-|-- /utils
-|   |-- ids.js
-|   |-- rating.js
-|-- App.jsx
-|-- main.jsx
