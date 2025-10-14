@@ -1,131 +1,94 @@
-Darvin MVP
+Darvin MVP - Business Intelligence para Indústria e Varejo
+<p align="center">
+<img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/react/react-original.svg" alt="React" width="60" height="60"/>
+<img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/vitejs/vitejs-original.svg" alt="Vite" width="60" height="60"/>
+<img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/bootstrap/bootstrap-plain.svg" alt="React Bootstrap" width="60" height="60"/>
+</p>
 
+<p align="center">
+<strong>Uma plataforma de BI e PDV que conecta o pequeno varejo à indústria, transformando dados de venda em insights estratégicos.</strong>
+</p>
+<p align="center">
+Solução desenvolvida para o <strong>Challenge 2025 da FIAP</strong> em parceria com a empresa <strong>Astéria</strong>.
+</p>
 
+🚀 O Desafio
+A indústria e o pequeno varejo enfrentam um grande obstáculo: a falta de visibilidade dos dados de venda ao consumidor final (sell-out). Essas informações são cruciais para criar campanhas eficientes, gerenciar estoques e entender o comportamento do consumidor. As soluções existentes são caras, complexas e inacessíveis para o pequeno comerciante, que muitas vezes não possui sistemas de gestão integrados.
 
-O Darvin MVP (Minimum Viable Product) é uma plataforma de business intelligence e ponto de venda (PDV) desenvolvida como solução para o Challenge 2025 da FIAP, em parceria com a empresa Astéria. A aplicação foi projetada para resolver um dos grandes desafios enfrentados pela indústria e pelo pequeno varejo: a coleta e análise de dados de sell-out.
+O desafio proposto pela Astéria foi criar uma solução que fosse:
 
+Acessível e Eficiente: Para coletar dados de forma simples, sem integrações complexas.
 
+Inteligente: Com um BI que gere insights acionáveis para a tomada de decisão.
 
-A plataforma simula um ecossistema onde varejistas podem gerenciar suas vendas e estoque de forma simplificada, enquanto a indústria obtém acesso a dados estruturados e insights valiosos sobre a performance de seus produtos no ponto de venda. O projeto foi construído inteiramente em front-end com React e Vite, utilizando o localStorage do navegador para simular um banco de dados, tornando-o funcional sem a necessidade de um back-end.
+Escalável: Com potencial para ser aplicada em diversos setores do comércio.
 
-O Desafio Astéria
-A indústria e o varejo enfrentam dificuldades para obter dados de venda ao consumidor final (sell-out), essenciais para criar campanhas estratégicas, gerenciar estoques e aumentar o market share. As soluções existentes são, em geral, de alto custo, complexas e não atendem o pequeno varejo, que não possui sistemas de ERP ou frentes de caixa integrados.
+Valiosa: Gerando benefícios claros tanto para a indústria quanto para o varejo.
 
+✨ A Solução: Darvin MVP
+O Darvin MVP é um ecossistema simulado que funciona inteiramente no navegador, sem a necessidade de um back-end. Ele oferece uma suíte de ferramentas para o varejista gerenciar suas operações diárias e, ao mesmo tempo, fornece à indústria uma visão clara e detalhada da performance de seus produtos no ponto de venda.
 
+A plataforma é dividida em dois portais:
 
-O desafio proposto pela Astéria foi criar uma solução inovadora que fosse:
+🏪 Para o Varejista (Retail)
+Um conjunto de ferramentas para simplificar a gestão e impulsionar as vendas.
 
+Dashboard Analítico: KPIs essenciais (receita, vendas, ticket médio), gráficos de performance por dia e categoria, e ranking de produtos mais vendidos.
 
-Acessível e Eficiente: Para coletar dados sem depender de integrações complexas.
-
-
-Inteligente: Com um BI que entregue insights relevantes para a tomada de decisão.
-
-
-Escalável: Com aplicabilidade em diversos setores do comércio.
-
-
-Viável: Com um modelo de monetização sustentável e que gere valor tanto para a indústria quanto para o varejo.
-
-Funcionalidades
-A plataforma é dividida em dois portais principais: Varejista e Indústria.
-
-Para o Varejista (Retail)
-Dashboard Analítico: Visualização de KPIs (Key Performance Indicators) como receita total, número de vendas e ticket médio, com filtros por período. Apresenta gráficos de receita por dia e por categoria, além de uma lista dos produtos mais vendidos.
-
-Assistente de Performance: Uma área que fornece insights e recomendações acionáveis, como alertas de estoque baixo para produtos populares, itens perto da validade e produtos com baixo giro.
+Assistente de Performance: Insights proativos gerados por IA, como alertas de estoque baixo para produtos populares, itens próximos da validade e produtos com baixo giro.
 
 Múltiplos Pontos de Venda (PDV):
 
-PDV Tradicional: Interface visual para selecionar produtos e registrar vendas em tempo real, ideal para o dia a dia da loja.
+PDV Tradicional: Interface visual e rápida para vendas do dia a dia.
 
-Anota Aí: Uma planilha online para registrar rapidamente múltiplas vendas que ocorreram ao longo do dia, de forma consolidada.
+Anota Aí: Uma "planilha online" para registrar múltiplas vendas de forma consolidada no fim do dia.
 
-Upload de Planilha: Permite o registro de múltiplas vendas em lote através do upload de um arquivo .xlsx ou .csv.
+Upload de Planilha: Ferramenta para importar vendas em lote a partir de arquivos .xlsx ou .csv.
 
-Gestão de Estoque: Tabela completa para visualização e gerenciamento do inventário, com detalhes por lote, data de validade, custo, preço de venda e margem.
+Gestão de Estoque Completa: Controle total do inventário, com detalhes por lote, data de validade, custo, preço de venda e margem de lucro calculada.
 
-Programas de Incentivo: Área para visualizar e participar de campanhas de incentivo oferecidas pelas indústrias, com acompanhamento de progresso.
+Programas de Incentivo: Participe de campanhas criadas pelas indústrias e acompanhe seu progresso para ganhar prêmios e benefícios.
 
-Configurações da Loja: Formulário para visualizar e editar as informações cadastrais do estabelecimento.
+🏭 Para a Indústria (Industry)
+Uma visão estratégica para entender o mercado e otimizar a distribuição.
 
-Para a Indústria (Industry)
-Dashboard: Visão geral da performance dos seus produtos nos varejos parceiros, com KPIs de receita, unidades vendidas e varejistas ativos.
+Dashboard Consolidado: KPIs de performance dos seus produtos em toda a rede de varejistas parceiros (receita, unidades vendidas, varejistas ativos).
 
-Gestão de Programas: Ferramenta para criar, editar e acompanhar o desempenho dos programas de incentivo oferecidos aos varejistas.
+Gestão de Programas: Crie e gerencie campanhas de incentivo para engajar os varejistas e impulsionar as vendas de produtos específicos.
 
-Darvin Vision: Módulo de advanced analytics que oferece insights sobre:
+Darvin Vision (Advanced Analytics):
 
-Comportamento de Compra: Análise de cestas de produtos (combos mais vendidos) e padrões de venda por dia da semana e região.
+Análise de Cesta: Descubra quais produtos são comprados juntos com mais frequência (análise de combos).
 
-Perfil Demográfico: Entendimento do perfil dos consumidores (gênero, faixa etária) que compram seus produtos.
+Perfil Demográfico: Entenda o perfil dos consumidores (gênero, faixa etária) que compram seus produtos.
 
-Oportunidades de Mercado: Identificação de segmentos de alto valor e potencial de cross-selling.
+Oportunidades de Mercado: Identifique segmentos de alto valor e potencial de cross-selling para direcionar estratégias de marketing.
 
-Tecnologias Utilizadas
+🛠️ Arquitetura e Tecnologias
+Este projeto foi construído com uma arquitetura 100% front-end. Para simular um ambiente real sem a necessidade de um servidor ou banco de dados, toda a persistência de dados é gerenciada através do localStorage do navegador.
+
+seed.js: Popula o localStorage com um ecossistema completo de dados (indústrias, varejistas, produtos, clientes e um histórico de 4000 vendas) na primeira execução.
+
+selectors.js: Atua como uma camada de business intelligence, processando e cruzando os dados brutos do localStorage para gerar os KPIs, gráficos e insights exibidos nos dashboards.
+
 <p align="center">
-<a href="https://react.dev/" target="_blank" rel="noreferrer">
-<img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/react/react-original.svg" alt="React" width="40" height="40"/>
-</a>
-<a href="https://vitejs.dev/" target="_blank" rel="noreferrer">
-<img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/vitejs/vitejs-original.svg" alt="Vite" width="40" height="40"/>
-</a>
-<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" target="_blank" rel="noreferrer">
-<img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/javascript/javascript-original.svg" alt="JavaScript" width="40" height="40"/>
-</a>
-<a href="https://reactrouter.com/" target="_blank" rel="noreferrer">
-<img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/reactrouter/reactrouter-original.svg" alt="React Router" width="40" height="40"/>
-</a>
-<a href="https://react-bootstrap.github.io/" target="_blank" rel="noreferrer">
-<img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/bootstrap/bootstrap-plain.svg" alt="React Bootstrap" width="40" height="40"/>
-</a>
-<a href="https://recharts.org/" target="_blank" rel="noreferrer">
-<img src="https://raw.githubusercontent.com/recharts/recharts/master/logo.png" alt="Recharts" width="120" height="40"/>
-</a>
-<a href="https://eslint.org/" target="_blank" rel="noreferrer">
-<img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/eslint/eslint-original.svg" alt="ESLint" width="40" height="40"/>
-</a>
-<a href="https://www.w3.org/html/" target="_blank" rel="noreferrer">
-<img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/html5/html5-original.svg" alt="HTML5" width="40" height="40"/>
-</a>
-<a href="https://www.w3.org/Style/CSS/specs.en.html" target="_blank" rel="noreferrer">
-<img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/css3/css3-original.svg" alt="CSS3" width="40" height="40"/>
-</a>
+<a href="https://react.dev/" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/react/react-original.svg" alt="React" width="40" height="40"/></a>
+<a href="https://vitejs.dev/" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/vitejs/vitejs-original.svg" alt="Vite" width="40" height="40"/></a>
+<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/javascript/javascript-original.svg" alt="JavaScript" width="40" height="40"/></a>
+<a href="https://reactrouter.com/" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/reactrouter/reactrouter-original.svg" alt="React Router" width="40" height="40"/></a>
+<a href="https://react-bootstrap.github.io/" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/bootstrap/bootstrap-plain.svg" alt="React Bootstrap" width="40" height="40"/></a>
+<a href="https://recharts.org/" target="_blank" rel="noreferrer"><img src="https://camo.githubusercontent.com/a61061730a66f7f2235c607833a69a5e8f498c4d15682c3f3f01b315629f19a0/68747470733a2f2f72656368617274732e6f72672f656e2d55532f6173736574732f6c6f676f2e737667" alt="Recharts" height="40"/></a>
+<a href="https://eslint.org/" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/eslint/eslint-original.svg" alt="ESLint" width="40" height="40"/></a>
 </p>
 
-React: Biblioteca principal para a construção da interface de usuário.
+React e Vite: Para uma experiência de desenvolvimento moderna e performática.
 
-Vite: Ferramenta de build e desenvolvimento rápido para projetos web modernos.
+React Router: Para o gerenciamento de rotas e navegação.
 
-React Router: Para o gerenciamento das rotas e navegação da aplicação.
+React Bootstrap: Para a construção de uma UI elegante e responsiva.
 
-React Bootstrap: Biblioteca de componentes de UI baseada no Bootstrap para agilizar o desenvolvimento do layout.
-
-Recharts: Biblioteca para a criação de gráficos e visualizações de dados.
+Recharts: Para a criação dos gráficos e visualizações de dados.
 
 date-fns: Para manipulação e formatação de datas.
 
-xlsx: Para a leitura e processamento de arquivos de planilhas.
-
-ESLint: Para a análise estática do código, garantindo a qualidade e a padronização.
-
-Como Executar o Projeto
-Clone o repositório:
-
-Bash
-
-git clone https://github.com/seu-usuario/darvin-mvp.git
-cd darvin-mvp
-Instale as dependências:
-
-Bash
-
-npm install
-Execute o projeto em modo de desenvolvimento:
-
-Bash
-
-npm run dev
-A aplicação estará disponível em http://localhost:5173.
-
-
+xlsx: Para a funcionalidade de upload de planilhas.
