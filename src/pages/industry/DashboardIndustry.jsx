@@ -2,12 +2,12 @@
 // --- TECNOLOGIA: React, JSX, JavaScript, Recharts, React-Bootstrap ---
 
 import React, { useState, useMemo } from 'react';
-import { useAuth } from '../../hooks/useAuth';
-import { getIndustryDashboardData } from '../../state/selectors'; // Será criada a seguir
+import { useAuth } from '../../hooks/useAuth.js';
+import { getIndustryDashboardData } from '../../state/selectors.js'; // Será criada a seguir
 import { Container, Row, Col, Card, ButtonGroup, Button, Table, Badge } from 'react-bootstrap';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const COLORS = ['#0d6efd', '#6f42c1', '#d63384', '#fd7e14', '#198754', '#ffc107', '#20c997'];
+const COLORS = ['#0d6efd', '#6f42c1', '#d63384', '#fd7e14', '#198754', '#ffc107', '#20c97'];
 
 const DashboardIndustry = () => {
     const { user } = useAuth();
@@ -67,7 +67,7 @@ const DashboardIndustry = () => {
 
             <Row className="mt-4">
                 {/* Gráfico de Vendas por Varejista */}
-                <Col md={8}>
+                <Col md={12}>
                     <Card>
                         <Card.Body>
                             <Card.Title>Vendas por Varejista (em R$)</Card.Title>
@@ -84,30 +84,30 @@ const DashboardIndustry = () => {
                         </Card.Body>
                     </Card>
                 </Col>
-                {/* Gráfico de Receita por Produto */}
-                <Col md={4}>
+            </Row>
+
+            <Row className="mt-4">
+               {/* Gráfico de Receita por Produto (Top 5) */}
+                <Col md={12}>
                     <Card>
                         <Card.Body>
-                            <Card.Title>Receita por Produto</Card.Title>
+                            <Card.Title>Top 5 Produtos (Receita)</Card.Title>
                             <ResponsiveContainer width="100%" height={300}>
-                                <PieChart>
-                                    {/* --- ATUALIZAÇÃO APLICADA AQUI --- */}
-                                    <Pie 
-                                        data={charts.revenueByProduct} 
-                                        dataKey="Receita" 
-                                        nameKey="name" 
-                                        cx="50%" 
-                                        cy="50%" 
-                                        outerRadius={100} 
-                                        labelLine={false}
-                                        label={renderCustomizedLabel} // Usa a função de formatação
-                                    >
-                                        {charts.revenueByProduct.map((entry, index) => (
+                                <BarChart
+                                    layout="vertical"
+                                    data={charts.revenueByProduct.sort((a, b) => b.Receita - a.Receita).slice(0, 5).reverse()}
+                                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis type="number" tickFormatter={(value) => `R$${value}`} />
+                                    <YAxis dataKey="name" type="category" width={150} tick={{ fontSize: 12 }} />
+                                    <Tooltip formatter={(value) => `R$ ${value.toFixed(2)}`} />
+                                    <Bar dataKey="Receita">
+                                        {charts.revenueByProduct.slice(0, 5).map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
-                                    </Pie>
-                                    <Tooltip formatter={(value) => `R$ ${value.toFixed(2)}`} />
-                                </PieChart>
+                                    </Bar>
+                                </BarChart>
                             </ResponsiveContainer>
                         </Card.Body>
                     </Card>
@@ -154,3 +154,4 @@ const DashboardIndustry = () => {
 };
 
 export default DashboardIndustry;
+
