@@ -1,12 +1,18 @@
 // --- ARQUIVO: src/pages/retail/pos/UploadPOS.jsx ---
 // --- TECNOLOGIA: React, JSX, JavaScript ---
+// --- INTERFACE COMPLETAMENTE REFORMULADA ---
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useAuth } from '../../../hooks/useAuth';
-import { getInventoryByRetailer } from '../../../state/selectors';
-import { setItem, getItem } from '../../../state/storage';
-import { generateId } from '../../../utils/ids';
-import { Container, Button, Alert, Table, Row, Col, Form, OverlayTrigger, Tooltip, Card, Modal } from 'react-bootstrap';
+import { useAuth } from '../../../hooks/useAuth.js';
+import { getInventoryByRetailer } from '../../../state/selectors.js';
+import { setItem, getItem } from '../../../state/storage.js';
+import { generateId } from '../../../utils/ids.js';
+import { Container, Button, Alert, Table, Row, Col, Form, OverlayTrigger, Tooltip, Card, Modal, Badge } from 'react-bootstrap';
+import { 
+    CloudArrowUpFill, QuestionCircle, CheckCircleFill, ExclamationCircleFill, 
+    ArrowRight, BoxArrowInDown, Check2All, ShieldFillCheck, XCircleFill, Tools, LightningFill, PlusCircleFill
+} from 'react-bootstrap-icons';
+
 
 const PLATFORM_FIELDS = [
     { key: 'product_name', name: 'Nome do Produto', description: 'O nome do produto vendido.', tooltip: 'Este campo deve conter o nome ou SKU do produto.', required: true },
@@ -17,25 +23,6 @@ const PLATFORM_FIELDS = [
     { key: 'unit_cost', name: 'Preço de Custo (Unitário)', description: 'Custo de aquisição do produto (opcional).', tooltip: 'Valor pago pelo produto para cálculo de lucratividade.', required: false },
     { key: 'product_sku', name: 'SKU / Código do Produto', description: 'Código identificador do produto (opcional).', tooltip: 'Código de barras ou SKU para identificação precisa.', required: false }
 ];
-
-const CheckmarkIcon = () => ( 
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="bi bi-check-circle-fill text-primary" viewBox="0 0 16 16">
-        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
-    </svg> 
-);
-
-const QuestionIcon = () => ( 
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" className="bi bi-question-circle" viewBox="0 0 16 16">
-        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-        <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z"/>
-    </svg> 
-);
-
-const ErrorIcon = () => ( 
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-exclamation-circle-fill me-2 text-danger" viewBox="0 0 16 16">
-        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/>
-    </svg> 
-);
 
 const UploadPOS = () => {
     const { user } = useAuth();
@@ -257,7 +244,6 @@ const UploadPOS = () => {
                 ? cleanValue(row[mappedIndices.unit_cost]) 
                 : null;
             
-            // ✅ CORREÇÃO: Remove o prefixo "SKU-" se existir e limpa o valor
             let productSku = mappedIndices.product_sku !== undefined 
                 ? cleanValue(row[mappedIndices.product_sku]) 
                 : null;
@@ -290,7 +276,6 @@ const UploadPOS = () => {
             
             let status = 'valid';
             
-            // ✅ CORREÇÃO: Busca produto e usa o SKU dele se encontrado
             let product = null;
             if (productSku) {
                 product = inventory.find(p => p.sku === productSku);
@@ -299,7 +284,6 @@ const UploadPOS = () => {
                 product = inventory.find(p => p.nome === productNameRaw);
             }
 
-            // Se encontrou o produto, usa o SKU dele
             const finalSku = product ? product.sku : productSku;
 
             if (!product) status = 'newProduct';
@@ -322,7 +306,6 @@ const UploadPOS = () => {
         
         const groupedSales = groupTransactions(validationResults.valid, validationResults.groupingStrategy);
         
-        // ✅ CORREÇÃO: Mapeia quantidades vendidas por productId para desconto de estoque
         const quantitiesSoldByProduct = {};
         
         validationResults.valid.forEach(item => {
@@ -332,7 +315,6 @@ const UploadPOS = () => {
             }
         });
         
-        // ✅ CORREÇÃO: Desconta as quantidades vendidas do estoque usando FIFO
         const updatedInventory = allInventory.map(invItem => {
             const soldQty = quantitiesSoldByProduct[invItem.productId];
             
@@ -455,15 +437,24 @@ const UploadPOS = () => {
                     isDragging={isDragging} 
                     setIsDragging={setIsDragging} 
                     fileInputRef={fileInputRef} 
+                    onCancel={resetForNewUpload}
                 />;
         }
     };
     
     if (!user) return <Container><p>Carregando...</p></Container>;
-    return <div className="upload-container">{renderStep()}</div>;
+    return (
+        <Container fluid>
+            <Row className="justify-content-center">
+                <Col lg={10} xl={10}>
+                    {renderStep()}
+                </Col>
+            </Row>
+        </Container>
+    );
 };
 
-const UploadStep = ({ processFile, isDragging, setIsDragging, fileInputRef }) => {
+const UploadStep = ({ processFile, isDragging, setIsDragging, fileInputRef, onCancel }) => {
     const handleDragEnter = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
     const handleDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
     const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
@@ -479,113 +470,110 @@ const UploadStep = ({ processFile, isDragging, setIsDragging, fileInputRef }) =>
     const triggerFileSelect = () => fileInputRef.current.click();
 
     return (
-        <div className="upload-step-container">
-            <h2 className="text-center">Importar dados de vendas</h2>
-            <p className="text-center text-muted mb-4">Arraste e solte seu arquivo ou selecione-o do seu computador.</p>
-            <div 
-                className="drop-zone" 
-                onDragEnter={handleDragEnter} 
-                onDragLeave={handleDragLeave} 
-                onDragOver={handleDragOver} 
-                onDrop={handleDrop}
-            >
-                <div className={`drop-zone-inner ${isDragging ? 'dragging' : ''}`}>
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleFileSelect} 
-                        accept=".csv,.xlsx,.xls" 
-                        style={{ display: 'none' }} 
-                    />
-                    <div className="drop-zone-content">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" className="bi bi-cloud-arrow-up-fill text-primary mb-3" viewBox="0 0 16 16">
-                            <path d="M8 2a5.53 5.53 0 0 0-3.594 1.342c-.766.66-1.321 1.52-1.464 2.383C1.266 6.095 0 7.555 0 9.318 0 11.366 1.708 13 3.781 13h8.906C14.502 13 16 11.57 16 9.773c0-1.636-1.242-2.969-2.834-3.194C12.923 3.999 10.69 2 8 2zm2.354 5.146a.5.5 0 0 1-.708.708L8.5 6.707V10.5a.5.5 0 0 1-1 0V6.707L6.354 7.854a.5.5 0 1 1-.708-.708l2-2a.5.5 0 0 1 .708 0l2 2z"/>
-                        </svg>
-                        <h5 className="text-secondary">Arraste e solte seu arquivo aqui</h5>
-                        <p className="text-muted my-2">ou</p>
-                        <Button variant="primary" className="btn-upload" onClick={triggerFileSelect}>
-                            Selecione um arquivo
+        <Card className="shadow-sm">
+            <Card.Body className="p-lg-5">
+                <div className="text-center">
+                    <h1 className="h3 mb-1">Importar Vendas de Planilha</h1>
+                    <p className="text-muted mb-4">Envie um arquivo .CSV ou .XLSX para registrar suas vendas em massa.</p>
+                </div>
+                
+                <div className="d-flex justify-content-center">
+                    <div 
+                        style={{width: '100%', maxWidth: '600px'}}
+                        className={`drop-zone p-5 d-flex flex-column align-items-center justify-content-center ${isDragging ? 'dragging' : ''}`}
+                        onDragEnter={handleDragEnter} 
+                        onDragLeave={handleDragLeave} 
+                        onDragOver={handleDragOver} 
+                        onDrop={handleDrop}
+                    >
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            onChange={handleFileSelect} 
+                            accept=".csv,.xlsx,.xls" 
+                            className="d-none"
+                        />
+                        <div className="drop-zone-icon-wrapper mb-3">
+                            <CloudArrowUpFill size={32} className="drop-zone-icon" />
+                        </div>
+                        <h5 className="mb-2">Arraste e solte seu arquivo aqui</h5>
+                        <p className="text-muted mb-3">ou</p>
+                        <Button variant="primary" onClick={triggerFileSelect}>
+                            <BoxArrowInDown className="me-2" />
+                            Selecionar Arquivo
                         </Button>
-                        <p className="text-muted small mt-3">Aceitamos arquivos no formato .CSV ou .XLSX.</p>
                     </div>
                 </div>
-            </div>
-            <a href="#" className="mt-4 d-block text-center">Não sabe por onde começar? Baixe nosso modelo de planilha</a>
-        </div>
+
+                <div className="d-flex justify-content-center mt-4">
+                    <Alert variant="light" className="d-flex align-items-center text-start" style={{width: '100%', maxWidth: '600px'}}>
+                        <Check2All size={24} className="text-primary me-3" />
+                        <div>
+                            <strong>Não sabe por onde começar?</strong>
+                            <p className="mb-0 small">
+                                Para garantir que seus dados sejam importados corretamente, <a href="#" onClick={(e) => e.preventDefault()}>baixe nosso modelo de planilha</a> e preencha com suas informações.
+                            </p>
+                        </div>
+                    </Alert>
+                </div>
+            </Card.Body>
+        </Card>
     );
 };
 
 const MappingStep = ({ headers, map, setMap, onVerify, onCancel, error, setError }) => {
-    const [rememberMapping, setRememberMapping] = useState(true);
     
     const handleSelectChange = (platformKey, selectedHeader) => {
         setMap(prevMap => ({ ...prevMap, [platformKey]: selectedHeader }));
     };
 
     return (
-        <div className="mapping-screen-bg">
-            <div className="mapping-container">
+        <Card className="shadow-sm">
+            <Card.Body className="p-lg-5">
+                 <h1 className="h3 mb-1">Mapeamento de Colunas</h1>
+                <p className="text-muted mb-4">Associe as colunas do seu arquivo aos campos da nossa plataforma para garantir a importação correta.</p>
+
                 {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
-                <Row className="g-5">
-                    <Col lg={6}>
-                        <h2 className="mapping-title">Campos da Nossa Plataforma</h2>
-                        <div className="d-flex flex-column gap-3">
-                            {PLATFORM_FIELDS.map(field => (
-                                <div key={field.key} className="platform-field-card">
-                                    <div>
-                                        <p className="fw-semibold mb-1">{field.name}</p>
-                                        <p className="text-muted small mb-0">{field.description}</p>
-                                    </div>
-                                    <OverlayTrigger placement="top" overlay={<Tooltip>{field.tooltip}</Tooltip>}>
-                                        <button className="btn-icon">
-                                            <QuestionIcon />
-                                        </button>
-                                    </OverlayTrigger>
-                                </div>
-                            ))}
-                        </div>
-                    </Col>
-                    <Col lg={6}>
-                        <h2 className="mapping-title">Colunas do Seu Arquivo</h2>
-                        <div className="d-flex flex-column gap-4">
-                            {PLATFORM_FIELDS.map(field => (
-                                <div key={field.key} className="mapping-field-item">
-                                    <Form.Group>
-                                        <Form.Label className="small fw-medium mb-2">{field.name}</Form.Label>
-                                        <div className="mapping-input-wrapper">
-                                            <Form.Select 
-                                                className="mapping-select" 
-                                                value={map[field.key] || ''} 
-                                                onChange={(e) => handleSelectChange(field.key, e.target.value)}
-                                            >
-                                                <option value="" disabled>Selecione uma coluna</option>
-                                                {headers.map((header, index) => (
-                                                    <option key={index} value={header}>{header}</option>
-                                                ))}
-                                                <option value="">Não informar</option>
-                                            </Form.Select>
-                                            {map[field.key] && <CheckmarkIcon />}
+
+                <Row className="g-4">
+                    {PLATFORM_FIELDS.map(field => (
+                        <Col md={6} key={field.key}>
+                            <Card className="h-100">
+                                <Card.Body>
+                                    <div className="d-flex justify-content-between align-items-start">
+                                        <div className="me-2">
+                                            <Card.Title as="h6">{field.name} {field.required && <span className="text-danger">*</span>}</Card.Title>
+                                            <Card.Subtitle as="p" className="text-muted small">{field.description}</Card.Subtitle>
                                         </div>
-                                    </Form.Group>
-                                </div>
-                            ))}
-                        </div>
-                    </Col>
+                                        <OverlayTrigger placement="top" overlay={<Tooltip>{field.tooltip}</Tooltip>}>
+                                            <span className="text-muted" style={{ cursor: 'help' }}><QuestionCircle /></span>
+                                        </OverlayTrigger>
+                                    </div>
+                                     <Form.Select 
+                                        className="mt-3"
+                                        value={map[field.key] || ''} 
+                                        onChange={(e) => handleSelectChange(field.key, e.target.value)}
+                                    >
+                                        <option value="" disabled>Selecione uma coluna...</option>
+                                        {headers.map((header, index) => (
+                                            <option key={index} value={header}>{header}</option>
+                                        ))}
+                                        {!field.required && <option value="">Não informar</option>}
+                                    </Form.Select>
+                                </Card.Body>
+                            </Card>
+                        </Col>
+                    ))}
                 </Row>
-                <div className="mapping-footer">
-                    <Form.Check 
-                        type="switch" 
-                        id="remember-mapping-switch" 
-                        label="Lembrar desta organização" 
-                        checked={rememberMapping} 
-                        onChange={(e) => setRememberMapping(e.target.checked)} 
-                    />
-                    <Button variant="primary" className="verify-button" onClick={onVerify}>
-                        Verificar e pré-visualizar dados
-                    </Button>
-                </div>
-            </div>
-        </div>
+            </Card.Body>
+            <Card.Footer className="p-3 bg-light d-flex justify-content-between align-items-center">
+                <Button variant="outline-secondary" onClick={onCancel}>Cancelar Importação</Button>
+                <Button variant="primary" onClick={onVerify}>
+                    <ShieldFillCheck className="me-2" />
+                    Verificar e Validar Dados
+                </Button>
+            </Card.Footer>
+        </Card>
     );
 };
 
@@ -593,12 +581,7 @@ const ValidationStep = ({ results, onConfirm, onCancel, onProductRegistered, use
     const [showProductModal, setShowProductModal] = useState(false);
     const [currentProductData, setCurrentProductData] = useState(null);
     const [productForm, setProductForm] = useState({
-        nome: '',
-        sku: '',
-        categoria: '',
-        estoque: 0,
-        custoMedio: 0,
-        precoVenda: 0
+        nome: '', sku: '', categoria: '', estoque: 0, custoMedio: 0, precoVenda: 0
     });
 
     const handleOpenProductModal = (rowData) => {
@@ -617,101 +600,59 @@ const ValidationStep = ({ results, onConfirm, onCancel, onProductRegistered, use
     const handleSaveProduct = () => {
         const allProducts = getItem('products') || [];
         const allInventory = getItem('inventory') || [];
-        
         const productId = generateId();
-        
         const newProduct = {
-            id: productId,
-            sku: productForm.sku,
-            nome: productForm.nome,
-            categoria: productForm.categoria,
-            subcategoria: productForm.categoria,
-            industryId: 'generic',
-            precoSugerido: parseFloat(productForm.precoVenda),
-            supplierIds: [],
-            marca: 'Importado'
+            id: productId, sku: productForm.sku, nome: productForm.nome, categoria: productForm.categoria,
+            subcategoria: productForm.categoria, industryId: 'generic', precoSugerido: parseFloat(productForm.precoVenda),
+            supplierIds: [], marca: 'Importado'
         };
-        
         setItem('products', [...allProducts, newProduct]);
         
-        const validade = new Date();
-        validade.setDate(validade.getDate() + 90);
+        const validade = new Date(); validade.setDate(validade.getDate() + 90);
         
         const newInventoryItem = {
-            id: generateId(),
-            retailerId: user.actorId,
-            productId: productId,
-            nome: productForm.nome,
-            sku: productForm.sku,
-            categoria: productForm.categoria,
-            marca: 'Importado',
-            estoque: parseInt(productForm.estoque),
-            custoMedio: parseFloat(productForm.custoMedio),
-            precoVenda: parseFloat(productForm.precoVenda),
-            precoSugerido: parseFloat(productForm.precoVenda),
+            id: generateId(), retailerId: user.actorId, productId: productId, nome: productForm.nome,
+            sku: productForm.sku, categoria: productForm.categoria, marca: 'Importado',
+            estoque: parseInt(productForm.estoque), custoMedio: parseFloat(productForm.custoMedio),
+            precoVenda: parseFloat(productForm.precoVenda), precoSugerido: parseFloat(productForm.precoVenda),
             dataValidade: validade.toISOString()
         };
-        
         setItem('inventory', [...allInventory, newInventoryItem]);
-        
         onProductRegistered(currentProductData, newProduct, newInventoryItem);
-        
         setShowProductModal(false);
     };
 
     const handleBulkRegister = () => {
-        if (!window.confirm(`Deseja cadastrar automaticamente ${results.newProduct.length} produtos? Todos receberão valores padrão baseados na planilha.`)) {
-            return;
-        }
+        if (!window.confirm(`Deseja cadastrar automaticamente ${results.newProduct.length} produtos? Todos receberão valores padrão baseados na planilha.`)) return;
 
         const allProducts = getItem('products') || [];
         const allInventory = getItem('inventory') || [];
-        
         const newProducts = [];
         const newInventoryItems = [];
         const productDataMap = new Map();
         
         results.newProduct.forEach((row) => {
             const productId = generateId();
-            
             const newProduct = {
-                id: productId,
-                sku: `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                nome: row.productName,
-                categoria: 'Alimentos',
-                subcategoria: 'Diversos',
-                industryId: 'generic',
-                precoSugerido: parseFloat(row.unitPrice) || 0,
-                supplierIds: [],
-                marca: 'Importado'
+                id: productId, sku: `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, nome: row.productName,
+                categoria: 'Alimentos', subcategoria: 'Diversos', industryId: 'generic',
+                precoSugerido: parseFloat(row.unitPrice) || 0, supplierIds: [], marca: 'Importado'
             };
             
-            const validade = new Date();
-            validade.setDate(validade.getDate() + 90);
+            const validade = new Date(); validade.setDate(validade.getDate() + 90);
             
             const newInventoryItem = {
-                id: generateId(),
-                retailerId: user.actorId,
-                productId: productId,
-                nome: row.productName,
-                sku: newProduct.sku,
-                categoria: 'Alimentos',
-                marca: 'Importado',
+                id: generateId(), retailerId: user.actorId, productId: productId, nome: row.productName,
+                sku: newProduct.sku, categoria: 'Alimentos', marca: 'Importado',
                 estoque: parseInt(row.quantity) || 0,
                 custoMedio: parseFloat((parseFloat(row.unitPrice) * 0.7).toFixed(2)) || 0,
-                precoVenda: parseFloat(row.unitPrice) || 0,
-                precoSugerido: parseFloat(row.unitPrice) || 0,
+                precoVenda: parseFloat(row.unitPrice) || 0, precoSugerido: parseFloat(row.unitPrice) || 0,
                 dataValidade: validade.toISOString()
             };
             
             newProducts.push(newProduct);
             newInventoryItems.push(newInventoryItem);
-            
-            const key = `${row.productName}-${row.originalRow}`;
-            productDataMap.set(key, {
-                row,
-                product: { ...newProduct, ...newInventoryItem }
-            });
+            productDataMap.set(`${row.productName}-${row.originalRow}`, { row, product: { ...newProduct, ...newInventoryItem } });
         });
         
         setItem('products', [...allProducts, ...newProducts]);
@@ -723,21 +664,7 @@ const ValidationStep = ({ results, onConfirm, onCancel, onProductRegistered, use
                 const key = `${row.productName}-${row.originalRow}`;
                 if (productDataMap.has(key)) {
                     const data = productDataMap.get(key);
-                    return { 
-                        ...row, 
-                        status: 'valid', 
-                        product: {
-                            id: data.product.productId,
-                            productId: data.product.productId,
-                            sku: data.product.sku,
-                            nome: data.product.nome,
-                            categoria: data.product.categoria,
-                            marca: data.product.marca,
-                            estoque: data.product.estoque,
-                            custoMedio: data.product.custoMedio,
-                            precoVenda: data.product.precoVenda
-                        }
-                    };
+                    return { ...row, status: 'valid', product: { ...data.product, id: data.product.productId } };
                 }
                 return row;
             })
@@ -746,283 +673,142 @@ const ValidationStep = ({ results, onConfirm, onCancel, onProductRegistered, use
         updatedResults.valid = updatedResults.all.filter(r => r.status === 'valid');
         updatedResults.newProduct = updatedResults.all.filter(r => r.status === 'newProduct');
         updatedResults.error = updatedResults.all.filter(r => r.status === 'error');
-        
         onProductRegistered(null, null, null, updatedResults);
     };
 
     const canProceed = results.newProduct.length === 0 && results.error.length === 0;
 
-    const renderDate = (date) => {
-        if (date instanceof Date && !isNaN(date)) {
-            return date.toLocaleDateString('pt-BR');
-        }
-        return <span className="text-danger">Data Inválida</span>;
-    };
-
-    const renderNumber = (num) => {
-        if (typeof num === 'number' && !isNaN(num)) {
-            return num;
-        }
-        return <span className="text-danger">Inválido</span>;
-    };
-
-    const renderPrice = (price) => {
-        if (typeof price === 'number' && !isNaN(price)) {
-            return `R$ ${price.toFixed(2)}`;
-        }
-        return <span className="text-danger">Inválido</span>;
-    };
-
     return (
-        <div className="validation-container">
-            <div className="validation-header">
-                <p className="text-muted small mb-2">Importar / Validar Dados</p>
-                <h2>Validar Dados</h2>
-                <p className="text-muted">Revise os dados importados, cadastre novos produtos e corrija erros antes de confirmar.</p>
-            </div>
+        <Card className="shadow-sm">
+            <Card.Body className="p-lg-5">
+                 <h1 className="h3 mb-1">Validação dos Dados</h1>
+                <p className="text-muted mb-4">Revise, corrija e confirme os dados antes da importação final.</p>
+                
+                <Row className="g-3 mb-4">
+                    <Col><Card body className="text-center"><p className="text-muted small mb-1">Vendas Válidas</p><h4 className="mb-0 text-success">{results.valid.length}</h4></Card></Col>
+                    <Col><Card body className="text-center"><p className="text-muted small mb-1">Produtos Novos</p><h4 className="mb-0 text-warning">{results.newProduct.length}</h4></Card></Col>
+                    <Col><Card body className="text-center"><p className="text-muted small mb-1">Erros</p><h4 className="mb-0 text-danger">{results.error.length}</h4></Card></Col>
+                </Row>
 
-            <Card className="summary-card">
-                <Card.Body>
-                    <Row className="text-center">
-                        <Col>
-                            <p className="text-muted small mb-1">Vendas Válidas</p>
-                            <h3 className="summary-count">{results.valid.length}</h3>
-                        </Col>
-                        <Col>
-                            <p className="text-muted small mb-1">Produtos Não Cadastrados</p>
-                            <h3 className="summary-count text-warning">{results.newProduct.length}</h3>
-                        </Col>
-                        <Col>
-                            <p className="text-muted small mb-1">Erros de Dados</p>
-                            <h3 className="summary-count text-danger">{results.error.length}</h3>
-                        </Col>
-                    </Row>
-                    
-                    {results.groupingStrategy === 'datetime' && (
-                        <Alert variant="info" className="mt-3 mb-0">
-                            <strong>ℹ️ Informação sobre Agrupamento:</strong> Não identificamos uma coluna de ID de transação. Para organizar os dados, as vendas que ocorreram exatamente no mesmo horário serão agrupadas em uma única compra. Por favor, verifique o resultado após a importação.
-                        </Alert>
-                    )}
-                    
-                    {!canProceed && (
-                        <>
-                            <Alert variant="warning" className="mt-3 mb-2">
-                                <strong>Atenção:</strong> Cadastre todos os produtos novos antes de prosseguir com a importação.
-                            </Alert>
-                            {results.newProduct.length > 0 && (
-                                <div className="text-center">
-                                    <Button 
-                                        variant="success" 
-                                        onClick={handleBulkRegister}
-                                        size="lg"
-                                        className="me-2"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" className="bi bi-lightning-fill me-2" viewBox="0 0 16 16">
-                                            <path d="M5.52.359A.5.5 0 0 1 6 0h4a.5.5 0 0 1 .474.658L8.694 6H12.5a.5.5 0 0 1 .395.807l-7 9a.5.5 0 0 1-.873-.454L6.823 9.5H3.5a.5.5 0 0 1-.48-.641l2.5-8.5z"/>
-                                        </svg>
-                                        Cadastrar Todos os {results.newProduct.length} Produtos
-                                    </Button>
-                                    <small className="text-muted d-block mt-2">
-                                        Ou cadastre individualmente clicando no botão de cada linha
-                                    </small>
-                                </div>
-                            )}
-                        </>
-                    )}
-                </Card.Body>
-            </Card>
-
-            <div className="validation-table-container">
-                <Table hover responsive className="validation-table">
-                    <thead>
-                        <tr>
-                            <th>Data da Venda</th>
-                            <th>Produto</th>
-                            <th>Quantidade</th>
-                            <th>Preço Unitário</th>
-                            <th>Total</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {results.all.map((row, index) => {
-                            const total = isNaN(row.quantity) || isNaN(row.unitPrice) ? 0 : row.quantity * row.unitPrice;
-                            return (
-                                <tr key={index} className={`row-${row.status}`}>
-                                    <td>
-                                        {row.status === 'error' && (
-                                            <OverlayTrigger
-                                                placement="top"
-                                                overlay={
-                                                    <Tooltip>
-                                                        {isNaN(row.saleDate.getTime()) 
-                                                            ? `Data inválida: "${row.rawDateValue}". Use formato DD/MM/AAAA`
-                                                            : 'Verifique quantidade e preço'}
-                                                    </Tooltip>
-                                                }
-                                            >
-                                                <span><ErrorIcon /></span>
-                                            </OverlayTrigger>
-                                        )}
-                                        {renderDate(row.saleDate)}
-                                    </td>
-                                    <td style={{ wordBreak: 'break-word' }}>
-                                        {row.productName || <span className="text-muted">-</span>}
-                                    </td>
-                                    <td>{renderNumber(row.quantity)}</td>
-                                    <td>{renderPrice(row.unitPrice)}</td>
-                                    <td>{renderPrice(total)}</td>
-                                    <td>
-                                        {row.status === 'newProduct' && (
-                                            <Button variant="primary" size="sm" onClick={() => handleOpenProductModal(row)}>
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-plus-circle-fill me-1" viewBox="0 0 16 16">
-                                                    <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.5 4.5a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-3v-3z"/>
-                                                </svg>
-                                                Cadastrar Produto
-                                            </Button>
-                                        )}
-                                        {row.status === 'valid' && (
-                                            <span className="text-success small">✓ Pronto</span>
-                                        )}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </Table>
-            </div>
+                {!canProceed && (
+                     <Alert variant="warning">
+                         <Alert.Heading>Ação Necessária</Alert.Heading>
+                         <p>Encontramos produtos que não estão cadastrados no seu sistema. Por favor, cadastre-os para poder importar as vendas relacionadas.</p>
+                        {results.newProduct.length > 0 && (
+                            <>
+                                <hr/>
+                                <Button variant="success" onClick={handleBulkRegister}>
+                                    <LightningFill className="me-2" />
+                                    Cadastrar {results.newProduct.length} Novos Produtos
+                                </Button>
+                            </>
+                        )}
+                     </Alert>
+                )}
             
-            <div className="validation-footer">
-                <Button variant="outline-secondary" onClick={onCancel}>
-                    Voltar e Corrigir o Mapeamento
-                </Button>
-                <Button 
-                    variant="primary" 
-                    onClick={onConfirm}
-                    disabled={!canProceed}
-                >
+                <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    <Table hover>
+                        <thead className="table-light" style={{ position: 'sticky', top: 0 }}>
+                            <tr>
+                                <th>Status</th><th>Data Venda</th><th>Produto</th>
+                                <th className="text-center">Qtd.</th>
+                                <th className="text-end">Preço Unit.</th>
+                                <th className="text-end">Total</th>
+                                <th className="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {results.all.map((row, index) => {
+                                const total = isNaN(row.quantity) || isNaN(row.unitPrice) ? 0 : row.quantity * row.unitPrice;
+                                return (
+                                    <tr key={index}>
+                                        <td>
+                                            {row.status === 'valid' && <Badge bg="success-soft" text="success" className="py-2 px-2">Válido</Badge>}
+                                            {row.status === 'newProduct' && <Badge bg="warning-soft" text="warning" className="py-2 px-2">Novo Produto</Badge>}
+                                            {row.status === 'error' && <Badge bg="danger-soft" text="danger" className="py-2 px-2">Erro</Badge>}
+                                        </td>
+                                        <td>{new Date(row.saleDate).toLocaleDateString('pt-BR')}</td>
+                                        <td>{row.productName}</td>
+                                        <td className="text-center">{row.quantity}</td>
+                                        <td className="text-end">R$ {row.unitPrice?.toFixed(2)}</td>
+                                        <td className="text-end fw-bold">R$ {total.toFixed(2)}</td>
+                                        <td className="text-center">
+                                            {row.status === 'newProduct' && 
+                                                <Button variant="outline-primary" size="sm" onClick={() => handleOpenProductModal(row)}>
+                                                    <PlusCircleFill /> Cadastrar
+                                                </Button>}
+                                            {row.status === 'error' && 
+                                                 <OverlayTrigger placement="top" overlay={<Tooltip>Corrija na planilha e reimporte.</Tooltip>}>
+                                                    <span className="text-muted" style={{cursor: 'help'}}><Tools /></span>
+                                                </OverlayTrigger>
+                                            }
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </Table>
+                </div>
+            </Card.Body>
+             <Card.Footer className="p-3 bg-light d-flex justify-content-between align-items-center">
+                <Button variant="outline-secondary" onClick={onCancel}><ArrowRight className="me-2" style={{transform: "rotate(180deg)"}}/> Voltar ao Mapeamento</Button>
+                <Button variant="primary" onClick={onConfirm} disabled={!canProceed}>
+                    <Check2All className="me-2"/>
                     Confirmar e Importar ({results.valid.length} vendas)
                 </Button>
-            </div>
+            </Card.Footer>
 
-            <Modal show={showProductModal} onHide={() => setShowProductModal(false)} size="lg">
-                <Modal.Header closeButton>
-                    <Modal.Title>Cadastrar Novo Produto</Modal.Title>
-                </Modal.Header>
+             <Modal show={showProductModal} onHide={() => setShowProductModal(false)} size="lg" centered>
+                <Modal.Header closeButton><Modal.Title>Cadastrar Novo Produto</Modal.Title></Modal.Header>
                 <Modal.Body>
-                    <Alert variant="info">
-                        Preencha os dados do produto. Alguns campos foram preenchidos automaticamente com base na planilha.
-                    </Alert>
+                    <Alert variant="info">Preencha os dados do produto. Alguns campos foram preenchidos automaticamente.</Alert>
                     <Form>
-                        <Row>
-                            <Col md={8}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Nome do Produto *</Form.Label>
-                                    <Form.Control 
-                                        type="text" 
-                                        value={productForm.nome}
-                                        onChange={(e) => setProductForm({...productForm, nome: e.target.value})}
-                                        required
-                                    />
+                        <Row><Col md={8}>
+                                <Form.Group className="mb-3"><Form.Label>Nome do Produto *</Form.Label>
+                                    <Form.Control type="text" value={productForm.nome} onChange={(e) => setProductForm({...productForm, nome: e.target.value})} required/>
                                 </Form.Group>
-                            </Col>
-                            <Col md={4}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>SKU *</Form.Label>
-                                    <Form.Control 
-                                        type="text" 
-                                        value={productForm.sku}
-                                        onChange={(e) => setProductForm({...productForm, sku: e.target.value})}
-                                        required
-                                    />
+                            </Col><Col md={4}>
+                                <Form.Group className="mb-3"><Form.Label>SKU *</Form.Label>
+                                    <Form.Control type="text" value={productForm.sku} onChange={(e) => setProductForm({...productForm, sku: e.target.value})} required/>
                                 </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={4}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Categoria *</Form.Label>
-                                    <Form.Select 
-                                        value={productForm.categoria}
-                                        onChange={(e) => setProductForm({...productForm, categoria: e.target.value})}
-                                    >
-                                        <option value="Alimentos">Alimentos</option>
-                                        <option value="Bebidas">Bebidas</option>
-                                        <option value="Limpeza">Limpeza</option>
-                                        <option value="Higiene">Higiene</option>
+                        </Col></Row>
+                        <Row><Col md={4}>
+                                <Form.Group className="mb-3"><Form.Label>Categoria *</Form.Label>
+                                    <Form.Select value={productForm.categoria} onChange={(e) => setProductForm({...productForm, categoria: e.target.value})}>
+                                        <option value="Alimentos">Alimentos</option><option value="Bebidas">Bebidas</option>
+                                        <option value="Limpeza">Limpeza</option><option value="Higiene">Higiene</option>
                                     </Form.Select>
                                 </Form.Group>
-                            </Col>
-                            <Col md={4}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Estoque Inicial *</Form.Label>
-                                    <Form.Control 
-                                        type="number" 
-                                        value={productForm.estoque}
-                                        onChange={(e) => setProductForm({...productForm, estoque: e.target.value})}
-                                        min="0"
-                                        required
-                                    />
+                            </Col><Col md={4}>
+                                <Form.Group className="mb-3"><Form.Label>Estoque Inicial *</Form.Label>
+                                    <Form.Control type="number" value={productForm.estoque} onChange={(e) => setProductForm({...productForm, estoque: e.target.value})} min="0" required/>
                                 </Form.Group>
-                            </Col>
-                            <Col md={4}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Custo Médio *</Form.Label>
-                                    <Form.Control 
-                                        type="number" 
-                                        step="0.01"
-                                        value={productForm.custoMedio}
-                                        onChange={(e) => setProductForm({...productForm, custoMedio: e.target.value})}
-                                        min="0"
-                                        required
-                                    />
+                            </Col><Col md={4}>
+                                <Form.Group className="mb-3"><Form.Label>Custo Médio *</Form.Label>
+                                    <Form.Control type="number" step="0.01" value={productForm.custoMedio} onChange={(e) => setProductForm({...productForm, custoMedio: e.target.value})} min="0" required/>
                                 </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Preço de Venda *</Form.Label>
-                                    <Form.Control 
-                                        type="number" 
-                                        step="0.01"
-                                        value={productForm.precoVenda}
-                                        onChange={(e) => setProductForm({...productForm, precoVenda: e.target.value})}
-                                        min="0"
-                                        required
-                                    />
+                        </Col></Row>
+                        <Row><Col md={6}>
+                                <Form.Group className="mb-3"><Form.Label>Preço de Venda *</Form.Label>
+                                    <Form.Control type="number" step="0.01" value={productForm.precoVenda} onChange={(e) => setProductForm({...productForm, precoVenda: e.target.value})} min="0" required/>
                                 </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Margem de Lucro</Form.Label>
-                                    <Form.Control 
-                                        type="text" 
-                                        value={productForm.custoMedio > 0 
-                                            ? `${(((productForm.precoVenda - productForm.custoMedio) / productForm.custoMedio) * 100).toFixed(2)}%`
-                                            : '0%'}
-                                        disabled
-                                    />
+                            </Col><Col md={6}>
+                                <Form.Group className="mb-3"><Form.Label>Margem de Lucro</Form.Label>
+                                    <Form.Control type="text" value={productForm.custoMedio > 0 ? `${(((productForm.precoVenda - productForm.custoMedio) / productForm.custoMedio) * 100).toFixed(2)}%` : '0%'} disabled/>
                                 </Form.Group>
-                            </Col>
-                        </Row>
+                        </Col></Row>
                     </Form>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowProductModal(false)}>
-                        Cancelar
-                    </Button>
-                    <Button 
-                        variant="primary" 
-                        onClick={handleSaveProduct}
-                        disabled={!productForm.nome || !productForm.sku}
-                    >
+                    <Button variant="secondary" onClick={() => setShowProductModal(false)}>Cancelar</Button>
+                    <Button variant="primary" onClick={handleSaveProduct} disabled={!productForm.nome || !productForm.sku}>
                         Cadastrar e Continuar
                     </Button>
                 </Modal.Footer>
             </Modal>
-        </div>
+        </Card>
     );
 };
 
 export default UploadPOS;
+
