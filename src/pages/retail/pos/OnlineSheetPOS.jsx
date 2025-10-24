@@ -66,44 +66,92 @@ const OnlineSheetPOS = () => {
             return;
         }
 
+        console.log('[ANOTA AÍ] 🚀 Iniciando registro de vendas...');
+
+        // 1. Prepara os itens da venda
         const saleItems = rows.map(row => {
             const product = inventory.find(p => p.productId === row.productId);
             return {
-                productId: product.productId, sku: product.sku,
-                qtde: Number(row.qtde), precoUnit: product.avgPrice
+                productId: product.productId, 
+                sku: product.sku,
+                qtde: Number(row.qtde), 
+                precoUnit: product.avgPrice
             };
         });
 
         const totalLiquido = saleItems.reduce((acc, item) => acc + (item.qtde * item.precoUnit), 0);
 
+        // 2. CRÍTICO: Atualiza o estoque ANTES de registrar a venda
+        let rawInventory = getItem('inventory') || [];
+        console.log('[ANOTA AÍ] 🔍 Estoque RAW antes:', rawInventory.length, 'lotes');
+
+        for (const saleItem of saleItems) {
+            let quantityToDeduct = saleItem.qtde;
+            console.log(`[ANOTA AÍ] 📦 Processando: ProductID ${saleItem.productId}, Qtd: ${quantityToDeduct}`);
+
+            // Filtra lotes deste varejista e produto, com estoque disponível
+            const availableBatches = rawInventory
+                .map((batch, index) => ({ ...batch, arrayIndex: index }))
+                .filter(batch => 
+                    batch.retailerId === user.actorId && 
+                    batch.productId === saleItem.productId && 
+                    batch.estoque > 0
+                )
+                .sort((a, b) => new Date(a.dataValidade) - new Date(b.dataValidade)); // FEFO
+
+            console.log(`[ANOTA AÍ] 📋 Lotes disponíveis:`, availableBatches.length);
+
+            // Deduz quantidade lote por lote
+            for (const batch of availableBatches) {
+                if (quantityToDeduct === 0) break;
+                
+                const deductAmount = Math.min(quantityToDeduct, batch.estoque);
+                console.log(`[ANOTA AÍ]   ➖ Lote ${batch.id.substring(0, 8)}: Deduzindo ${deductAmount} (Tinha: ${batch.estoque})`);
+                
+                // Atualiza o array original
+                rawInventory[batch.arrayIndex].estoque -= deductAmount;
+                quantityToDeduct -= deductAmount;
+                
+                console.log(`[ANOTA AÍ]   ✅ Novo estoque: ${rawInventory[batch.arrayIndex].estoque}`);
+            }
+
+            if (quantityToDeduct > 0) {
+                console.error(`[ANOTA AÍ] ❌ ERRO: Faltam ${quantityToDeduct} unidades!`);
+                setError(`Estoque insuficiente para completar a operação.`);
+                return; // Cancela tudo
+            }
+        }
+
+        // 3. Salva o inventário atualizado
+        console.log('[ANOTA AÍ] 💾 Salvando inventário...');
+        setItem('inventory', rawInventory);
+
+        // Verifica se salvou
+        const verificacao = getItem('inventory');
+        console.log('[ANOTA AÍ] ✅ Verificação:', verificacao.length, 'lotes salvos');
+
+        // 4. Registra a venda
         const newSale = {
-            id: generateId(), retailerId: user.actorId, dataISO: new Date().toISOString(),
-            clienteId: 'consumidor_final', itens: saleItems, totalBruto: totalLiquido,
-            desconto: 0, totalLiquido: totalLiquido, formaPagamento: 'Anota Aí',
+            id: generateId(), 
+            retailerId: user.actorId, 
+            dataISO: new Date().toISOString(),
+            clienteId: 'consumidor_final', 
+            itens: saleItems, 
+            totalBruto: totalLiquido,
+            desconto: 0, 
+            totalLiquido: totalLiquido, 
+            formaPagamento: 'Anota Aí',
         };
 
         const allSales = getItem('sales') || [];
         setItem('sales', [...allSales, newSale]);
+        console.log('[ANOTA AÍ] 💰 Venda registrada!');
 
-        let currentInventory = getItem('inventory') || [];
-        for (const cartItem of saleItems) {
-            let quantityToDeduct = cartItem.qtde;
-            const productBatches = currentInventory
-                .filter(inv => inv.productId === cartItem.productId && inv.estoque > 0)
-                .sort((a, b) => new Date(a.dataValidade) - new Date(b.dataValidade));
-
-            for (const batch of productBatches) {
-                if (quantityToDeduct === 0) break;
-                const deductAmount = Math.min(quantityToDeduct, batch.estoque);
-                batch.estoque -= deductAmount;
-                quantityToDeduct -= deductAmount;
-            }
-        }
-        setItem('inventory', currentInventory);
-
-        setSuccess(`${saleItems.length} registros de venda foram agrupados e registrados com sucesso!`);
+        // 5. Limpa e atualiza a interface
+        setSuccess(`${saleItems.length} registros de venda foram agrupados e registrados com sucesso! Estoque atualizado.`);
         setRows([{ productId: '', qtde: 1, error: null }]);
         setLastUpdated(Date.now());
+        console.log('[ANOTA AÍ] 🔄 Interface atualizada!');
     };
 
     return (
@@ -175,7 +223,7 @@ const OnlineSheetPOS = () => {
                                 <li>Clique em "Registrar Todas as Vendas".</li>
                             </ol>
                             <Card.Text className="small">
-                                Todas as vendas serão agrupadas em uma única transação para simplificar seu histórico.
+                                Todas as vendas serão agrupadas em uma única transação para simplificar seu histórico. <strong>O estoque será automaticamente atualizado.</strong>
                             </Card.Text>
                         </Card.Body>
                     </Card>
