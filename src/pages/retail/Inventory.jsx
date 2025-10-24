@@ -445,9 +445,9 @@ const Inventory = () => {
             <Card className="mb-4">
                 <Card.Body><Row>
                     <Col md={4}><InputGroup><InputGroup.Text><Search /></InputGroup.Text><Form.Control placeholder="Buscar por nome, SKU ou marca..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></InputGroup></Col>
-                    <Col md={2}><Form.Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}><option value="all">Todas as Categorias</option>{categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}</Form.Select></Col>
-                    <Col md={3}><Form.Select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)}><option value="all">Todos os Estoques</option><option value="ok">Estoque OK</option><option value="low">Estoque Baixo</option><option value="out">Sem Estoque</option></Form.Select></Col>
-                    <Col md={3}><Form.Select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}><option value="all">Todas as Origens</option><option value="native">Cadastro Manual</option><option value="imported">Importado via Planilha</option></Form.Select></Col>
+                    <Col md={4}><Form.Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}><option value="all">Todas as Categorias</option>{categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}</Form.Select></Col>
+                    <Col md={4}><Form.Select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)}><option value="all">Todos os Estoques</option><option value="ok">Estoque OK</option><option value="low">Estoque Baixo</option><option value="out">Sem Estoque</option></Form.Select></Col>
+                   
                 </Row></Card.Body>
             </Card>
 
