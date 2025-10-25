@@ -397,3 +397,4 @@ const TraditionalPOS = () => {
 
 export default TraditionalPOS;
 
+//teste
