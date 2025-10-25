@@ -1,10 +1,11 @@
 // --- ARQUIVO: src/state/seed.js - VERSÃO EXPANDIDA MESCLADA ---
 import { setItem } from './storage';
 import { generateId } from '../utils/ids';
-import logoBoreal from '../assets/images/logos/logoBoreal.png';
-import logoDoceVida from '../assets/images/logos/logoDoceVida.png';
-import logoLimpMax from '../assets/images/logos/logoLimpMax.png';
-import logoBelezaPura from '../assets/images/logos/logoBelezaPura.png';
+import logoBoreal from '../assets/images/logos/LogoBoreal.png';
+import logoDoceVida from '../assets/images/logos/LogoDoceVida.png';
+import logoLimpMax from '../assets/images/logos/LogoLimpMax.png';
+import logoBelezaPura from '../assets/images/logos/logoBelezaPura.png'; // Este já estava correto
+
 
 export const seedDatabase = () => {
   console.log("🌱 Populando o localStorage com dados EXPANDIDOS...");
