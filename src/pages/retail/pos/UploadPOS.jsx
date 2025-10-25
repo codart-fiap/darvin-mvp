@@ -511,7 +511,7 @@ const UploadStep = ({ processFile, isDragging, setIsDragging, fileInputRef, onCa
                         <div>
                             <strong>Não sabe por onde começar?</strong>
                             <p className="mb-0 small">
-                                Para garantir que seus dados sejam importados corretamente, <a href="#" onClick={(e) => e.preventDefault()}>baixe nosso modelo de planilha</a> e preencha com suas informações.
+                                Para garantir que seus dados sejam importados corretamente, <a href="https://drive.google.com/file/d/11Ep8aXEFYoM3Fb5w2PBidBlEuA3CX4_C/view?usp=sharing" >baixe nosso modelo de planilha</a> e preencha com suas informações.
                             </p>
                         </div>
                     </Alert>
