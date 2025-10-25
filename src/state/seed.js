@@ -6,7 +6,9 @@ import logoDoceVida from '../assets/images/logos/LogoDoceVida.png';
 import logoLimpMax from '../assets/images/logos/LogoLimpMax.png';
 import logoBelezaPura from '../assets/images/logos/logoBelezaPura.png'; // Este já estava correto
 
+//teste krl
 
+//vai porra
 export const seedDatabase = () => {
   console.log("🌱 Populando o localStorage com dados EXPANDIDOS...");
 
