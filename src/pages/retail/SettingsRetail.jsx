@@ -1,146 +1,269 @@
-// --- ARQUIVO: src/pages/retail/SettingsRetail.jsx ---
-// --- TECNOLOGIA: React, JSX, JavaScript ---
-// Este componente de React cria um formulário para que o usuário do tipo "varejo"
-// possa ver e editar as informações da sua loja.
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { getActorData } from '../../state/selectors';
 import { getItem, setItem } from '../../state/storage';
 import { Container, Card, Form, Button, Col, Row, Alert } from 'react-bootstrap';
 
-// Definição do componente funcional `SettingsRetail`.
 const SettingsRetail = () => {
-    // Pegamos os dados do usuário logado do nosso hook.
     const { user } = useAuth();
-    // --- ESTADOS DO COMPONENTE ---
-    // `formData` vai guardar os dados do formulário (as informações da loja).
     const [formData, setFormData] = useState(null);
-    // `success` vai guardar a mensagem de sucesso para mostrar ao usuário.
     const [success, setSuccess] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(true);
 
-    // `useEffect` é um hook que executa um "efeito colateral".
-    // Este efeito será executado quando o componente for montado na tela e sempre que `user` mudar.
     useEffect(() => {
-        // Se já temos a informação do usuário...
-        if (user) {
-            // ...buscamos os dados completos da loja usando o `actorId` do usuário.
-            const retailerData = getActorData(user.actorId, 'retailer');
-            // E atualizamos o estado `formData` com esses dados, preenchendo o formulário.
-            setFormData(retailerData);
+        if (user && user.actorId) {
+            try {
+                // Busca diretamente na lista de retailers
+                const retailers = getItem('retailers') || [];
+                const retailerData = retailers.find(r => r.id === user.actorId);
+                
+                if (retailerData) {
+                    // Garante que todos os campos necessários existem
+                    setFormData({
+                        id: retailerData.id,
+                        nomeFantasia: retailerData.nomeFantasia || '',
+                        razaoSocial: retailerData.razaoSocial || '',
+                        cnpj: retailerData.cnpj || '',
+                        tipo: retailerData.tipo || '',
+                        contato: {
+                            telefone: retailerData.contato?.telefone || '',
+                            email: retailerData.contato?.email || ''
+                        },
+                        endereco: {
+                            logradouro: retailerData.endereco?.logradouro || '',
+                            bairro: retailerData.endereco?.bairro || '',
+                            cidade: retailerData.endereco?.cidade || '',
+                            uf: retailerData.endereco?.uf || '',
+                            cep: retailerData.endereco?.cep || ''
+                        }
+                    });
+                } else {
+                    setError('Dados do varejista não encontrados.');
+                }
+            } catch (err) {
+                console.error('Erro ao carregar dados:', err);
+                setError('Erro ao carregar os dados da loja.');
+            } finally {
+                setLoading(false);
+            }
         }
-    }, [user]); // A lista de dependências `[user]` diz ao React para re-executar este efeito se `user` mudar.
+    }, [user]);
 
-    // Função para lidar com mudanças nos campos do formulário.
     const handleInputChange = (e) => {
-        // `name` é o nome do campo (ex: 'nomeFantasia' ou 'endereco.cidade').
-        // `value` é o novo texto digitado pelo usuário.
         const { name, value } = e.target;
-        const keys = name.split('.'); // Separa o nome se for um campo aninhado.
+        const keys = name.split('.');
 
-        // Se `keys.length` for maior que 1, é um campo aninhado (como 'endereco.cidade').
         if (keys.length > 1) {
-            // Atualizamos o estado de forma mais complexa para objetos aninhados.
-            setFormData(prev => ({ // `prev` é o valor anterior do estado.
-                ...prev, // Copia todas as propriedades do objeto principal.
-                [keys[0]]: { // Acessa a chave aninhada (ex: 'endereco').
-                    ...prev[keys[0]], // Copia todas as propriedades do objeto aninhado.
-                    [keys[1]]: value // Atualiza a propriedade específica (ex: 'cidade').
+            setFormData(prev => ({
+                ...prev,
+                [keys[0]]: {
+                    ...prev[keys[0]],
+                    [keys[1]]: value
                 }
             }));
         } else {
-            // Se for um campo simples, a atualização é mais direta.
             setFormData(prev => ({ ...prev, [name]: value }));
         }
     };
 
-    // Função chamada quando o formulário é enviado (clique no botão "Salvar").
     const handleSubmit = (e) => {
-        e.preventDefault(); // Previne o comportamento padrão do navegador de recarregar a página.
-        // Pega a lista completa de varejistas do localStorage.
-        const allRetailers = getItem('retailers');
-        // Cria uma nova lista, substituindo os dados do varejista atual pelos dados do formulário.
-        const updatedRetailers = allRetailers.map(r => r.id === user.actorId ? formData : r);
-        // Salva a nova lista de volta no localStorage.
-        setItem('retailers', updatedRetailers);
-        // Define a mensagem de sucesso.
-        setSuccess('Dados atualizados com sucesso!');
+        e.preventDefault();
+        setError('');
+        setSuccess('');
+
+        try {
+            const allRetailers = getItem('retailers') || [];
+            const updatedRetailers = allRetailers.map(r => 
+                r.id === user.actorId ? formData : r
+            );
+            
+            setItem('retailers', updatedRetailers);
+            setSuccess('Dados atualizados com sucesso!');
+            
+            // Limpa a mensagem de sucesso após 3 segundos
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (err) {
+            console.error('Erro ao salvar:', err);
+            setError('Erro ao salvar os dados. Tente novamente.');
+        }
     };
-    
-    // Se `formData` ainda for `null` (ou seja, os dados ainda não foram carregados),
-    // mostramos uma mensagem de "Carregando...".
-    if (!formData) {
-        return <div>Carregando...</div>;
+
+    if (loading) {
+        return (
+            <Container fluid>
+                <div className="text-center mt-5">
+                    <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Carregando...</span>
+                    </div>
+                </div>
+            </Container>
+        );
     }
 
-    // --- RENDERIZAÇÃO DO COMPONENTE ---
+    if (error && !formData) {
+        return (
+            <Container fluid>
+                <Alert variant="danger" className="mt-3">
+                    {error}
+                </Alert>
+            </Container>
+        );
+    }
+
     return (
         <Container fluid>
             <h1 className="h3 mb-3">Configurações da Loja</h1>
-            {/* Mostra o alerta de sucesso se a mensagem existir */}
-            {success && <Alert variant="success" onClose={() => setSuccess('')} dismissible>{success}</Alert>}
+            
+            {success && (
+                <Alert variant="success" onClose={() => setSuccess('')} dismissible>
+                    {success}
+                </Alert>
+            )}
+            
+            {error && (
+                <Alert variant="danger" onClose={() => setError('')} dismissible>
+                    {error}
+                </Alert>
+            )}
+
             <Card>
                 <Card.Body>
-                    {/* O `Form` do React Bootstrap que chama `handleSubmit` ao ser enviado */}
                     <Form onSubmit={handleSubmit}>
                         <Row>
-                            {/* Cada campo do formulário é um `Form.Group` com `Form.Label` e `Form.Control` */}
                             <Col md={6}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Nome Fantasia</Form.Label>
-                                    <Form.Control type="text" name="nomeFantasia" value={formData.nomeFantasia} onChange={handleInputChange} />
+                                    <Form.Control 
+                                        type="text" 
+                                        name="nomeFantasia" 
+                                        value={formData?.nomeFantasia || ''} 
+                                        onChange={handleInputChange}
+                                        required
+                                    />
                                 </Form.Group>
                             </Col>
                             <Col md={6}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Razão Social</Form.Label>
-                                    <Form.Control type="text" name="razaoSocial" value={formData.razaoSocial} onChange={handleInputChange} />
+                                    <Form.Control 
+                                        type="text" 
+                                        name="razaoSocial" 
+                                        value={formData?.razaoSocial || ''} 
+                                        onChange={handleInputChange}
+                                        required
+                                    />
                                 </Form.Group>
                             </Col>
                             <Col md={6}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>CNPJ</Form.Label>
-                                    <Form.Control type="text" name="cnpj" value={formData.cnpj} readOnly disabled />
+                                    <Form.Control 
+                                        type="text" 
+                                        name="cnpj" 
+                                        value={formData?.cnpj || ''} 
+                                        readOnly 
+                                        disabled 
+                                    />
+                                </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Tipo de Estabelecimento</Form.Label>
+                                    <Form.Control 
+                                        type="text" 
+                                        name="tipo" 
+                                        value={formData?.tipo || ''} 
+                                        onChange={handleInputChange}
+                                    />
+                                </Form.Group>
+                            </Col>
+                        </Row>
+
+                        <hr />
+                        <h5>Contato</h5>
+                        <Row>
+                            <Col md={6}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Telefone</Form.Label>
+                                    <Form.Control 
+                                        type="text" 
+                                        name="contato.telefone" 
+                                        value={formData?.contato?.telefone || ''} 
+                                        onChange={handleInputChange}
+                                    />
                                 </Form.Group>
                             </Col>
                             <Col md={6}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Email de Contato</Form.Label>
-                                    <Form.Control type="email" name="contato.email" value={formData.contato.email} onChange={handleInputChange} />
+                                    <Form.Control 
+                                        type="email" 
+                                        name="contato.email" 
+                                        value={formData?.contato?.email || ''} 
+                                        onChange={handleInputChange}
+                                        required
+                                    />
                                 </Form.Group>
                             </Col>
                         </Row>
+
                         <hr />
                         <h5>Endereço</h5>
                         <Row>
                             <Col md={8}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Logradouro</Form.Label>
-                                    <Form.Control type="text" name="endereco.logradouro" value={formData.endereco.logradouro} onChange={handleInputChange} />
+                                    <Form.Control 
+                                        type="text" 
+                                        name="endereco.logradouro" 
+                                        value={formData?.endereco?.logradouro || ''} 
+                                        onChange={handleInputChange}
+                                    />
                                 </Form.Group>
                             </Col>
                             <Col md={4}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Bairro</Form.Label>
-                                    <Form.Control type="text" name="endereco.bairro" value={formData.endereco.bairro} onChange={handleInputChange} />
+                                    <Form.Control 
+                                        type="text" 
+                                        name="endereco.bairro" 
+                                        value={formData?.endereco?.bairro || ''} 
+                                        onChange={handleInputChange}
+                                    />
                                 </Form.Group>
                             </Col>
-                             <Col md={6}>
+                            <Col md={6}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Cidade</Form.Label>
-                                    <Form.Control type="text" name="endereco.cidade" value={formData.endereco.cidade} onChange={handleInputChange} />
+                                    <Form.Control 
+                                        type="text" 
+                                        name="endereco.cidade" 
+                                        value={formData?.endereco?.cidade || ''} 
+                                        onChange={handleInputChange}
+                                    />
                                 </Form.Group>
                             </Col>
                             <Col md={2}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>UF</Form.Label>
-                                    <Form.Control type="text" name="endereco.uf" value={formData.endereco.uf} onChange={handleInputChange} />
+                                    <Form.Control 
+                                        type="text" 
+                                        name="endereco.uf" 
+                                        value={formData?.endereco?.uf || ''} 
+                                        onChange={handleInputChange}
+                                        maxLength={2}
+                                    />
                                 </Form.Group>
                             </Col>
-                             <Col md={4}>
+                            <Col md={4}>
                                 <Form.Group className="mb-3">
                                     <Form.Label>CEP</Form.Label>
-                                    <Form.Control type="text" name="endereco.cep" value={formData.endereco.cep} onChange={handleInputChange} />
+                                    <Form.Control 
+                                        type="text" 
+                                        name="endereco.cep" 
+                                        value={formData?.endereco?.cep || ''} 
+                                        onChange={handleInputChange}
+                                    />
                                 </Form.Group>
                             </Col>
                         </Row>
@@ -156,4 +279,3 @@ const SettingsRetail = () => {
 };
 
 export default SettingsRetail;
-
